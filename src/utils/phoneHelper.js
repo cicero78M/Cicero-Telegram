@@ -2,7 +2,7 @@
  * Phone number utility functions
  */
 
-export const minPhoneDigitLength = 10;
+export const minPhoneDigitLength = 8;
 
 /**
  * Normalize a WhatsApp/phone number by removing non-digit characters
