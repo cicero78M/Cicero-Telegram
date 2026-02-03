@@ -1,5 +1,4 @@
-/* global module */
-module.exports = {
+export default {
   apps: [
     {
       name: 'cicero_v2',
