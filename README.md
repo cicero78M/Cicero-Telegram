@@ -18,6 +18,7 @@ Role-aware deactivation flows (per-role removal across menus and REST) are cover
 - Editorial event planning, press-release drafting, and approval logging exposed under Penmas-protected routes.
 - Premium subscription management, link amplification (regular and khusus), and directorate-level recap exports.
 - Aggregated analytics APIs for dashboards, including combined operator, directorate, and complaint views.
+- Telegram bot integration for accessing dirRequest menus via private chat (see [docs/telegram_bot_setup.md](docs/telegram_bot_setup.md)).
 
 ## Requirements
 - Node.js 20 or newer
@@ -239,6 +240,8 @@ Application logs are timestamped using the Asia/Jakarta timezone by the console 
     ADMIN_NOTIFY_LOGIN=true
     DIRREQUEST_ENGAGE_RANK_RECIPIENT=628xxxx@c.us
     LAPHAR_ARCHIVE=false
+    TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
+    TELEGRAM_BOT_ENABLED=false
     ```
    Use `DB_DRIVER=postgres`, `postgresql`, or `pg` when connecting to Postgres so the backend applies the session settings (`app.current_*`) required by database row-level security. Switching `DB_DRIVER` to another value disables these Postgres-only settings.
    `ENABLE_DIRREQUEST_GROUP=false` disables all Ditbinmas dirRequest cron jobs at once while leaving other schedules intact.
@@ -249,6 +252,7 @@ Application logs are timestamped using the Asia/Jakarta timezone by the console 
    `RAPIDAPI_KEY` wajib diisi untuk semua fetch Instagram/TikTok. Endpoint seperti `/api/insta/rapid-info` akan mengembalikan error operasional (500/503) bila `RAPIDAPI_KEY` belum di-set, sebelum melakukan request keluar.
    `RAPIDAPI_FALLBACK_KEY` and `RAPIDAPI_FALLBACK_HOST` allow the TikTok fetcher to call an alternate RapidAPI host (`/user/videos`) when the primary `tiktok-api23` host fails or returns an empty payload. If the primary host only returns posts outside of the current Jakarta day (no tasks for today), the fetcher retries via the fallback host using the username to avoid missing same-day content—but only during the 11:00–17:15 WIB window to align with operational hours. The fallback endpoint should return a `videos` or `result.videos` array containing TikTok objects with identifiers (`video_id`/`id`) and timestamps (`create_time`/`createTime`) so the backend can normalize them.
    Untuk Instagram, `RAPIDAPI_FALLBACK_KEY`/`RAPIDAPI_FALLBACK_HOST` digunakan sebagai host cadangan saat host utama mengembalikan 401/403 (mis. key utama invalid atau rate limit). Isi `RAPIDAPI_FALLBACK_HOST` dengan host RapidAPI Instagram yang kompatibel agar fungsi `instaRapidService` otomatis retry menggunakan key/host cadangan.
+   `TELEGRAM_BOT_TOKEN` is your Telegram bot token from BotFather. `TELEGRAM_BOT_ENABLED=true` activates the bot. See [docs/telegram_bot_setup.md](docs/telegram_bot_setup.md) for detailed setup instructions.
 
 3. **Set up Redis**
     ```bash

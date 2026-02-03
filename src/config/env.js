@@ -40,5 +40,7 @@ export const env = cleanEnv(process.env, {
   GOOGLE_CONTACT_SCOPE: str({
     default: 'https://www.googleapis.com/auth/contacts'
   }),
-  DASHBOARD_PREMIUM_ALLOWED_TIERS: str({ default: 'tier1,tier2,premium_1' })
+  DASHBOARD_PREMIUM_ALLOWED_TIERS: str({ default: 'tier1,tier2,premium_1' }),
+  TELEGRAM_BOT_TOKEN: str({ default: '' }),
+  TELEGRAM_BOT_ENABLED: bool({ default: false })
 });
