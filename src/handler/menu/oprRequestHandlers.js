@@ -10,6 +10,7 @@ import {
   sortTitleKeys,
 } from "../../utils/utilsHelper.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
+import * as clientModel from "../../model/clientModel.js";
 
 function ignore(..._args) {}
 
@@ -2009,10 +2010,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
 
   // ===== ADMIN CHOOSE CLIENTS =====
   chooseClient_first: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2040,10 +2038,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   rekapLink_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2078,10 +2073,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   rekapLinkKemarin_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2116,10 +2108,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   rekapLinkPerPost_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2154,10 +2143,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   rekapLinkKhusus_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2192,10 +2178,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   rekapLinkKhususPerPost_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2230,10 +2213,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   updateTugas_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2268,10 +2248,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   absensiLink_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2306,10 +2283,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   absensiLinkKhusus_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2446,10 +2420,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   absensiReg_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2503,10 +2474,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   absensiUpdateData_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
@@ -2731,10 +2699,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   cekUser_chooseClient: async (session, chatId, text, waClient, pool) => {
-    const rows = await pool.query(
-      "SELECT client_id, nama FROM clients ORDER BY client_id"
-    );
-    const clients = rows.rows;
+    const clients = await clientModel.findAllActiveOrgClients();
     if (!clients.length) {
       await waClient.sendMessage(chatId, "Tidak ada client terdaftar.");
       session.step = "main";
