@@ -8,14 +8,11 @@ import routes from './src/routes/index.js';
 import authRoutes from './src/routes/authRoutes.js';
 import passwordResetAliasRoutes from './src/routes/passwordResetAliasRoutes.js';
 import claimRoutes from './src/routes/claimRoutes.js';
-import waHealthRoutes from './src/routes/waHealthRoutes.js';
 import { notFound, errorHandler } from './src/middleware/errorHandler.js';
 import { authRequired } from './src/middleware/authMiddleware.js';
 import { dedupRequest } from './src/middleware/dedupRequestMiddleware.js';
 import { sensitivePathGuard } from './src/middleware/sensitivePathGuard.js';
 import cronManifest from './src/cron/cronManifest.js';
-import { registerDirRequestCrons } from './src/cron/dirRequest/index.js';
-import { waClient, waGatewayClient } from './src/service/waService.js';
 import { startOtpWorker } from './src/service/otpQueue.js';
 
 const cronBuckets = cronManifest.reduce((buckets, { bucket, modulePath }) => {
@@ -49,35 +46,9 @@ function logBucketStatus(label, activated) {
   console.log(`[CRON] ${label} cron bucket ${status}`);
 }
 
-function scheduleCronBucket(client, bucketKey, label) {
-  const modules = cronBuckets[bucketKey] || [];
-  if (!modules.length) return;
-
-  const activateBucket = () =>
-    loadCronModules(modules)
-      .then(activated => logBucketStatus(label, activated))
-      .catch(err => console.error(`[CRON] Failed to activate ${label} cron bucket`, err));
-
-  client.on('ready', () => {
-    console.log(`[CRON] ${label} client ready event`);
-    activateBucket();
-  });
-
-  client
-    .waitForWaReady()
-    .then(() => {
-      console.log(`[CRON] ${label} client ready`);
-      return activateBucket();
-    })
-    .catch(err => console.error(`[CRON] Error waiting for ${label} readiness`, err));
-}
-
 loadCronModules(cronBuckets.always)
   .then(activated => logBucketStatus('Always', activated))
   .catch(err => console.error('[CRON] Failed to activate always cron bucket', err));
-
-scheduleCronBucket(waClient, 'waClient', 'WA client');
-registerDirRequestCrons(waGatewayClient);
 
 startOtpWorker().catch(err => console.error('[OTP] worker error', err));
 
@@ -102,7 +73,6 @@ app.all('/_next/dev/', (req, res) => res.status(200).json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/claim', claimRoutes);
 app.use('/api/password-reset', passwordResetAliasRoutes);
-app.use('/api/health/wa', waHealthRoutes);
 
 // ===== ROUTE LAIN (WAJIB TOKEN) =====
 app.use('/api', authRequired, routes);
