@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import oprRequestHandlers from '../handler/menu/oprRequestHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
+import * as clientModel from '../model/clientModel.js';
 import { createSendMessageWrapper } from '../utils/telegramBotHelpers.js';
 
 let operatorBot = null;
@@ -52,6 +53,28 @@ export async function initializeTelegramOperatorBot(token, enabled = true) {
     console.error('[Telegram Operator Bot] Failed to initialize:', error);
     return null;
   }
+}
+
+/**
+ * Show client selection menu to the user
+ * @param {number} chatId - Telegram chat ID
+ * @param {Array} clients - Array of active ORG clients
+ */
+async function showClientSelection(chatId, clients) {
+  let clientMenu = '📋 *Pilih Client (Tipe ORG)*\n\n';
+  clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
+  
+  // Emoji array supports up to 10 clients visually
+  // For more than 10 clients, falls back to numeric format
+  clients.forEach((client, index) => {
+    const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index] || `${index + 1}.`;
+    const nama = client.nama || client.client_id;
+    clientMenu += `${numberEmoji} ${client.client_id} - ${nama}\n`;
+  });
+  
+  clientMenu += '\nBalas dengan *angka* atau *Client ID* yang tertera, atau ketik *batal* untuk keluar.';
+  
+  await operatorBot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
 }
 
 /**
@@ -122,17 +145,36 @@ function setupCommandHandlers() {
       return;
     }
     
-    // Initialize or get user session
-    let session = userSessions.get(chatId);
-    if (!session) {
-      session = { step: 'main' };
-      userSessions.set(chatId, session);
-    }
-    
-    // Reset session to main menu
-    session.step = 'main';
-    
     try {
+      // Fetch all active ORG clients
+      const activeOrgClients = await clientModel.findAllActiveOrgClients();
+      
+      // Initialize or get user session
+      let session = userSessions.get(chatId);
+      if (!session) {
+        session = {};
+        userSessions.set(chatId, session);
+      }
+      
+      // If multiple clients available, show client selection
+      if (activeOrgClients && activeOrgClients.length > 1) {
+        // Store clients in session and set step to choose_client
+        session.opr_clients = activeOrgClients;
+        session.step = 'choose_client';
+        
+        // Show client selection menu
+        await showClientSelection(chatId, activeOrgClients);
+        return;
+      }
+      
+      // If only one client or no clients, set it and proceed to main menu
+      if (activeOrgClients && activeOrgClients.length === 1) {
+        session.selected_client_id = activeOrgClients[0].client_id;
+      }
+      
+      // Reset session to main menu
+      session.step = 'main';
+      
       // Create a pool-like object that uses the query function
       const pool = { query };
       
