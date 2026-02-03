@@ -228,7 +228,7 @@ export const userMenuHandlers = {
 
     await waClient.sendMessage(
       chatId,
-      `✏️ Ketik nilai baru untuk field *${escapeMarkdown(allowedFields[idx].label)}*${extra}.\n\nBalas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`,
+      `✏️ Ketik nilai baru untuk field *${allowedFields[idx].label}*${extra}.\n\nBalas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`,
       { parse_mode: 'Markdown' }
     );
   },
@@ -367,7 +367,7 @@ export const userMenuHandlers = {
     
     await waClient.sendMessage(
       chatId,
-      `✅ Data *${escapeMarkdown(fieldLabel)}* untuk NRP ${escapeMarkdown(user_id)} berhasil diupdate menjadi *${escapeMarkdown(displayValue)}*.\n\nKetik /menu untuk kembali ke menu utama.`,
+      `✅ Data *${fieldLabel}* untuk NRP ${escapeMarkdown(user_id)} berhasil diupdate menjadi *${escapeMarkdown(displayValue)}*.\n\nKetik /menu untuk kembali ke menu utama.`,
       { parse_mode: 'Markdown' }
     );
     delete session.availableTitles;

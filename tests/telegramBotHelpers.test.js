@@ -61,7 +61,14 @@ describe('escapeMarkdown', () => {
     const escaped = escapeMarkdown(problematicName);
     expect(escaped).toBe('POLRES\\_BANDUNG\\*CITY');
     
-    // Verify it doesn't contain unescaped special chars
-    expect(escaped).not.toMatch(/[^\\][*_`\[]/);
+    // Verify all special characters are escaped (preceded by backslash)
+    // Check that there are no unescaped asterisks
+    expect(escaped.match(/(?<!\\)\*/)).toBeNull();
+    // Check that there are no unescaped underscores
+    expect(escaped.match(/(?<!\\)_/)).toBeNull();
+    // Check that there are no unescaped backticks
+    expect(escaped.match(/(?<!\\)`/)).toBeNull();
+    // Check that there are no unescaped opening brackets
+    expect(escaped.match(/(?<!\\)\[/)).toBeNull();
   });
 });
