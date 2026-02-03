@@ -2482,6 +2482,9 @@ async function performAction(
       // await safeSendMessage(waClient, dirRequestGroup, normalizedMsg);
     }
   }
+  
+  // Return message for Telegram bot and other integrations
+  return normalizedMsg;
 }
 
 export async function runDirRequestAction({
