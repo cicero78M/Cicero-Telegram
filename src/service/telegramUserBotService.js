@@ -2,7 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { userMenuHandlers } from '../handler/menu/userMenuHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
-import { createSendMessageWrapper } from '../utils/telegramBotHelpers.js';
+import { createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
 let userBot = null;
 let isInitialized = false;
@@ -79,7 +79,7 @@ function setupCommandHandlers() {
     if (linkedUser) {
       const welcomeMessage = 
         '🤖 *Selamat datang kembali di Bot User Cicero!*\n\n' +
-        `Halo, *${linkedUser.nama || 'User'}*!\n\n` +
+        `Halo, *${escapeMarkdown(linkedUser.nama || 'User')}*!\n\n` +
         'Akun Telegram Anda sudah ditautkan.\n\n' +
         '*Perintah yang tersedia:*\n' +
         '/menu - Tampilkan menu user\n' +
@@ -227,9 +227,9 @@ function setupCommandHandlers() {
       await userBot.sendMessage(
         chatId,
         `✅ Akun Telegram Anda sudah ditautkan dengan:\n\n` +
-        `*Nama*: ${existingLink.nama || '-'}\n` +
-        `*NRP/NIP*: ${existingLink.user_id}\n` +
-        `*Satfung*: ${existingLink.divisi || '-'}\n\n` +
+        `*Nama*: ${escapeMarkdown(existingLink.nama || '-')}\n` +
+        `*NRP/NIP*: ${escapeMarkdown(existingLink.user_id)}\n` +
+        `*Satfung*: ${escapeMarkdown(existingLink.divisi || '-')}\n\n` +
         `Gunakan /menu untuk mengakses menu user.`,
         { parse_mode: 'Markdown' }
       );
@@ -302,13 +302,13 @@ function setupCommandHandlers() {
         chatId,
         '✅ *Permintaan Penautan Berhasil Dibuat*\n\n' +
         `Akun Telegram Anda akan ditautkan dengan:\n` +
-        `*Nama*: ${user.nama || '-'}\n` +
-        `*NRP/NIP*: ${user.user_id}\n` +
-        `*Satfung*: ${user.divisi || '-'}\n\n` +
-        `*Kode Persetujuan*: \`${pendingLink.approval_code}\`\n\n` +
+        `*Nama*: ${escapeMarkdown(user.nama || '-')}\n` +
+        `*NRP/NIP*: ${escapeMarkdown(user.user_id)}\n` +
+        `*Satfung*: ${escapeMarkdown(user.divisi || '-')}\n\n` +
+        `*Kode Persetujuan*: \`${escapeMarkdown(pendingLink.approval_code)}\`\n\n` +
         'Untuk menyelesaikan penautan, ketik:\n' +
         '`/approve KODE_ANDA`\n\n' +
-        `Contoh: \`/approve ${pendingLink.approval_code}\`\n\n` +
+        `Contoh: \`/approve ${escapeMarkdown(pendingLink.approval_code)}\`\n\n` +
         '_Kode akan kedaluwarsa dalam 24 jam._',
         { parse_mode: 'Markdown' }
       );
@@ -380,8 +380,8 @@ function setupCommandHandlers() {
         chatId,
         '✅ *Penautan Berhasil!*\n\n' +
         `Akun Telegram Anda telah berhasil ditautkan dengan:\n` +
-        `*Nama*: ${pendingLink.nama || '-'}\n` +
-        `*NRP/NIP*: ${pendingLink.user_id}\n\n` +
+        `*Nama*: ${escapeMarkdown(pendingLink.nama || '-')}\n` +
+        `*NRP/NIP*: ${escapeMarkdown(pendingLink.user_id)}\n\n` +
         'Sekarang Anda dapat mengakses menu user dengan perintah:\n' +
         '`/menu`',
         { parse_mode: 'Markdown' }

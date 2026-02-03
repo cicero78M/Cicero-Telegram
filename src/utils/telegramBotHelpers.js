@@ -30,3 +30,27 @@ export const MESSAGE_SPLIT_CONFIG = {
   MAX_LENGTH: 4000, // Telegram has 4096 limit, use 4000 for safety
   MIN_SPLIT_RATIO: 0.8, // When splitting, only use space if it's not too far back (80% threshold)
 };
+
+/**
+ * Escape Markdown special characters in text to prevent Telegram parsing errors
+ * This is used for user-provided data that will be included in messages with parse_mode: 'Markdown'
+ * 
+ * @param {string} text - The text to escape
+ * @returns {string} Escaped text safe for Markdown
+ */
+export function escapeMarkdown(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+  
+  // Escape Markdown special characters
+  // IMPORTANT: Escape backslash first to prevent double-escaping
+  // Then escape other Markdown special characters: * _ ` [
+  // Note: We only escape opening brackets [ to prevent link formatting issues
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\*/g, '\\*')
+    .replace(/_/g, '\\_')
+    .replace(/`/g, '\\`')
+    .replace(/\[/g, '\\[');
+}

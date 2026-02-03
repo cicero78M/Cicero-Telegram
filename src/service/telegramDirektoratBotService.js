@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
 import { findAllActiveDirektoratClients } from '../service/clientService.js';
-import { MESSAGE_SPLIT_CONFIG } from '../utils/telegramBotHelpers.js';
+import { MESSAGE_SPLIT_CONFIG, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
 let direktoratBot = null;
 let isInitialized = false;
@@ -334,8 +334,8 @@ async function handleClientSelection(chatId, input, from) {
     });
     
     const clientLabel = selectedClient.nama ? 
-      `${selectedClient.client_id} - ${selectedClient.nama}` : 
-      selectedClient.client_id;
+      `${escapeMarkdown(selectedClient.client_id)} - ${escapeMarkdown(selectedClient.nama)}` : 
+      escapeMarkdown(selectedClient.client_id);
     
     await direktoratBot.sendMessage(
       chatId, 
