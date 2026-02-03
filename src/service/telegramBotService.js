@@ -206,10 +206,20 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     const clientId = 'DITBINMAS';
     
     // Call the performAction function from dirRequestHandlers
-    const result = await performAction(menuNumber, clientId, {
-      username: from.username || from.first_name || 'telegram_user',
-      chatId: chatId.toString(),
-    });
+    // For Telegram bot, we don't have a WhatsApp client, so we pass null
+    const result = await performAction(
+      menuNumber,      // action
+      clientId,        // clientId
+      null,            // waClient (not used for Telegram)
+      chatId.toString(), // chatId
+      null,            // roleFlag
+      null,            // userClientId
+      {                // context
+        username: from.username || from.first_name || 'telegram_user',
+        chatId: chatId.toString(),
+      },
+      {}               // fallbackOptions
+    );
     
     // Send the result back to user
     if (result) {
