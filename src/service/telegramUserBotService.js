@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { userMenuHandlers } from '../handler/menu/userMenuHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
+import { createSendMessageWrapper } from '../utils/telegramBotHelpers.js';
 
 let userBot = null;
 let isInitialized = false;
@@ -34,14 +35,8 @@ export async function initializeTelegramUserBot(token, enabled = true) {
     userBot = new TelegramBot(token, { polling: true });
     
     // Add sendMessage wrapper to make bot compatible with WhatsApp-style handlers
-    userBot.sendMessage = async (chatId, message, options = {}) => {
-      try {
-        return await TelegramBot.prototype.sendMessage.call(userBot, chatId, message, options);
-      } catch (error) {
-        console.error('[Telegram User Bot] Error sending message:', error);
-        throw error;
-      }
-    };
+    const nativeSendMessage = TelegramBot.prototype.sendMessage;
+    userBot.sendMessage = createSendMessageWrapper(userBot, nativeSendMessage, 'User Bot');
     
     // Set up command handlers
     setupCommandHandlers();

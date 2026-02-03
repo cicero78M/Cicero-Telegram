@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import oprRequestHandlers from '../handler/menu/oprRequestHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
+import { createSendMessageWrapper } from '../utils/telegramBotHelpers.js';
 
 let operatorBot = null;
 let isInitialized = false;
@@ -34,14 +35,8 @@ export async function initializeTelegramOperatorBot(token, enabled = true) {
     operatorBot = new TelegramBot(token, { polling: true });
     
     // Add sendMessage wrapper to make bot compatible with WhatsApp-style handlers
-    operatorBot.sendMessage = async (chatId, message, options = {}) => {
-      try {
-        return await TelegramBot.prototype.sendMessage.call(operatorBot, chatId, message, options);
-      } catch (error) {
-        console.error('[Telegram Operator Bot] Error sending message:', error);
-        throw error;
-      }
-    };
+    const nativeSendMessage = TelegramBot.prototype.sendMessage;
+    operatorBot.sendMessage = createSendMessageWrapper(operatorBot, nativeSendMessage, 'Operator Bot');
     
     // Set up command handlers
     setupCommandHandlers();

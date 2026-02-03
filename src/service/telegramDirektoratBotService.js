@@ -1,6 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
 import { findAllActiveDirektoratClients } from '../service/clientService.js';
+import { MESSAGE_SPLIT_CONFIG } from '../utils/telegramBotHelpers.js';
 
 let direktoratBot = null;
 let isInitialized = false;
@@ -367,7 +368,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     // Send the result back to user
     if (result) {
       // Split long messages if needed (Telegram has a 4096 character limit)
-      const maxLength = 4000;
+      const maxLength = MESSAGE_SPLIT_CONFIG.MAX_LENGTH;
       if (result.length > maxLength) {
         // Split by newlines when possible to avoid breaking words/characters
         const chunks = [];
@@ -390,7 +391,8 @@ async function handleMenuSelection(chatId, menuNumber, from) {
                 if (remaining.length > maxLength) {
                   // Look for last space before maxLength
                   const lastSpace = remaining.lastIndexOf(' ', maxLength);
-                  if (lastSpace > maxLength * 0.8) { // Only use space if it's not too far back
+                  // Only use space split if it's not too far back (maintains readability)
+                  if (lastSpace > maxLength * MESSAGE_SPLIT_CONFIG.MIN_SPLIT_RATIO) {
                     splitPoint = lastSpace;
                   }
                 }
