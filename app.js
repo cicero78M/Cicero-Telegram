@@ -12,43 +12,7 @@ import { notFound, errorHandler } from './src/middleware/errorHandler.js';
 import { authRequired } from './src/middleware/authMiddleware.js';
 import { dedupRequest } from './src/middleware/dedupRequestMiddleware.js';
 import { sensitivePathGuard } from './src/middleware/sensitivePathGuard.js';
-import cronManifest from './src/cron/cronManifest.js';
 import { startOtpWorker } from './src/service/otpQueue.js';
-
-const cronBuckets = cronManifest.reduce((buckets, { bucket, modulePath }) => {
-  if (!bucket || !modulePath) return buckets;
-  if (!buckets[bucket]) buckets[bucket] = [];
-
-  if (!buckets[bucket].includes(modulePath)) {
-    buckets[bucket].push(modulePath);
-  }
-
-  return buckets;
-}, { always: [] });
-
-const loadedCronModules = new Set();
-
-async function loadCronModules(modules = []) {
-  const pendingModules = modules.filter(modulePath => !loadedCronModules.has(modulePath));
-  if (!pendingModules.length) return false;
-
-  await Promise.all(pendingModules.map(async modulePath => {
-    await import(modulePath);
-    loadedCronModules.add(modulePath);
-    console.log(`[CRON] Activated ${modulePath}`);
-  }));
-
-  return true;
-}
-
-function logBucketStatus(label, activated) {
-  const status = activated ? 'activated' : 'already active';
-  console.log(`[CRON] ${label} cron bucket ${status}`);
-}
-
-loadCronModules(cronBuckets.always)
-  .then(activated => logBucketStatus('Always', activated))
-  .catch(err => console.error('[CRON] Failed to activate always cron bucket', err));
 
 startOtpWorker().catch(err => console.error('[OTP] worker error', err));
 
