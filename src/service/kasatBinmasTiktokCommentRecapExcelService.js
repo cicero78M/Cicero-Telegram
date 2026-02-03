@@ -4,7 +4,8 @@ import XLSX from "xlsx";
 import { getRekapKomentarByClient } from "../model/tiktokCommentModel.js";
 import { getUsersByClient } from "../model/userModel.js";
 import { formatNama } from "../utils/utilsHelper.js";
-import { sendWAFile } from "../utils/waHelper.js";
+// WhatsApp functionality removed
+// import { sendWAFile } from "../utils/waHelper.js";
 import { matchesKasatBinmasJabatan } from "./kasatkerAttendanceService.js";
 import { describeKasatBinmasTiktokCommentPeriod } from "./kasatBinmasTiktokCommentRecapService.js";
 import { 
@@ -146,17 +147,18 @@ export async function sendKasatBinmasTiktokCommentRecapExcel({
 
   try {
     const buffer = await readFile(filePath);
-    await sendWAFile(
-      waClient,
-      buffer,
-      basename(filePath),
-      chatId,
-      EXCEL_MIME
-    );
-    await waClient.sendMessage(
-      chatId,
-      `✅ File rekap komentar TikTok Kasat Binmas (${periodLabel}) dikirim.`
-    );
+    // WhatsApp functionality removed
+    // await sendWAFile(
+    //   waClient,
+    //   buffer,
+    //   basename(filePath),
+    //   chatId,
+    //   EXCEL_MIME
+    // );
+    // await waClient.sendMessage(
+    //   chatId,
+    //   `✅ File rekap komentar TikTok Kasat Binmas (${periodLabel}) dikirim.`
+    // );
     return { periodLabel };
   } finally {
     if (filePath) {

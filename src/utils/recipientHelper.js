@@ -1,5 +1,6 @@
 import { getClientContactsById } from '../repository/clientContactRepository.js';
-import { formatToWhatsAppId, getAdminWAIds } from './waHelper.js';
+import { formatToWhatsAppId } from './phoneHelper.js';
+// WhatsApp admin IDs removed - getAdminWAIds was from waHelper.js
 
 function normalizeRecipient(value) {
   if (!value) return null;
@@ -27,14 +28,16 @@ function addRecipients(targetSet, candidates = []) {
 
 export async function buildClientRecipientSet(
   clientId,
+  // eslint-disable-next-line no-unused-vars
   { includeGroup = true, includeAdmins = true, includeSuper = true, includeOperator = true } = {}
 ) {
   const recipients = new Set();
   const contacts = await getClientContactsById(clientId);
 
-  if (includeAdmins) {
-    addRecipients(recipients, getAdminWAIds());
-  }
+  // WhatsApp functionality removed - admin WA IDs no longer available
+  // if (includeAdmins) {
+  //   addRecipients(recipients, getAdminWAIds());
+  // }
 
   if (includeSuper) {
     addRecipients(recipients, contacts.clientSuper);

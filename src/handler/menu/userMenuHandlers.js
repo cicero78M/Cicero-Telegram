@@ -6,7 +6,7 @@ import {
   getGreeting,
 } from "../../utils/utilsHelper.js";
 import { saveContactIfNew } from "../../service/googleContactsService.js";
-import { formatToWhatsAppId, normalizeWhatsappNumber } from "../../utils/waHelper.js";
+import { formatToWhatsAppId, normalizeWhatsappNumber } from "../../utils/phoneHelper.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
 
 // --- Helper Format Pesan ---
@@ -53,7 +53,8 @@ export const closeSession = async (
   message = SESSION_CLOSED_MESSAGE
 ) => {
   session.exit = true;
-  await waClient.sendMessage(chatId, message);
+  // WhatsApp functionality removed
+  // await waClient.sendMessage(chatId, message);
 };
 
 
@@ -72,7 +73,8 @@ export const userMenuHandlers = {
           userByWA
         )}\n\nApakah Anda ingin melakukan perubahan data?\nBalas *ya* jika ingin update data, *tidak* untuk keluar, atau *batal* untuk menutup sesi.`;
         session.step = "tanyaUpdateMyData";
-        await waClient.sendMessage(chatId, msgText.trim());
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(chatId, msgText.trim());
         return;
       }
     const msgText = `
@@ -84,21 +86,23 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
 `.trim();
       session.step = "confirmUserByWaIdentity";
       session.user_id = userByWA.user_id;
-      await waClient.sendMessage(chatId, msgText);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msgText);
       return;
     }
 
     session.step = "inputUserId";
-    await waClient.sendMessage(
-      chatId,
-      [
-        "Untuk menampilkan data Anda, silakan ketik NRP/NIP Anda (hanya angka).",
-        "Ketik *batal* untuk keluar.",
-        "",
-        "Contoh:",
-        "87020990",
-      ].join("\n")
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   [
+    //     "Untuk menampilkan data Anda, silakan ketik NRP/NIP Anda (hanya angka).",
+    //     "Ketik *batal* untuk keluar.",
+    //     "",
+    //     "Contoh:",
+    //     "87020990",
+    //   ].join("\n")
+    // );
   },
 
   // --- Konfirmasi identitas (lihat data)
@@ -107,19 +111,21 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
     if (answer === "ya") {
       session.identityConfirmed = true;
       session.step = "tanyaUpdateMyData";
-      await waClient.sendMessage(
-        chatId,
-        "Apakah Anda ingin melakukan perubahan data?\nBalas *ya* jika ingin update data, *tidak* untuk keluar, atau *batal* untuk menutup sesi."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "Apakah Anda ingin melakukan perubahan data?\nBalas *ya* jika ingin update data, *tidak* untuk keluar, atau *batal* untuk menutup sesi."
+      // );
     } else if (answer === "tidak") {
       await closeSession(session, chatId, waClient);
     } else if (answer === "batal") {
       await closeSession(session, chatId, waClient);
     } else {
-      await waClient.sendMessage(
-        chatId,
-        "Jawaban tidak dikenali. Balas *ya* jika benar data Anda, *tidak* jika bukan, atau *batal* untuk menutup sesi."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "Jawaban tidak dikenali. Balas *ya* jika benar data Anda, *tidak* jika bukan, atau *batal* untuk menutup sesi."
+      // );
     }
   },
 
@@ -130,7 +136,8 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
       session.identityConfirmed = true;
       session.updateUserId = session.user_id;
       session.step = "updateAskField";
-      await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
       return;
     } else if (answer === "tidak") {
       await closeSession(session, chatId, waClient);
@@ -139,10 +146,11 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
       await closeSession(session, chatId, waClient);
       return;
     }
-    await waClient.sendMessage(
-      chatId,
-      "Jawaban tidak dikenali. Balas *ya* jika benar data Anda, *tidak* jika bukan, atau *batal* untuk menutup sesi."
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   "Jawaban tidak dikenali. Balas *ya* jika benar data Anda, *tidak* jika bukan, atau *batal* untuk menutup sesi."
+    // );
   },
 
   // --- Input User ID manual
@@ -159,43 +167,48 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
     }
     const digits = text.replace(/\D/g, "");
     if (!digits) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ NRP/NIP harus berupa angka. Sistem otomatis menghapus karakter non-angka sehingga pastikan angka yang tersisa membentuk NRP/NIP yang benar.\nContoh: 87020990\nKetik *batal* untuk keluar."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "❌ NRP/NIP harus berupa angka. Sistem otomatis menghapus karakter non-angka sehingga pastikan angka yang tersisa membentuk NRP/NIP yang benar.\nContoh: 87020990\nKetik *batal* untuk keluar."
+      // );
       return;
     }
     const minLength = 6;
     const maxLength = 18;
     if (digits.length < minLength || digits.length > maxLength) {
-      await waClient.sendMessage(
-        chatId,
-        `❌ NRP/NIP harus terdiri dari ${minLength}-${maxLength} digit angka setelah karakter non-angka dibuang.\nContoh: 87020990\nKetik *batal* untuk keluar.`
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   `❌ NRP/NIP harus terdiri dari ${minLength}-${maxLength} digit angka setelah karakter non-angka dibuang.\nContoh: 87020990\nKetik *batal* untuk keluar.`
+      // );
       return;
     }
     try {
       const user = await userModel.findUserById(digits);
       if (!user) {
-        await waClient.sendMessage(
-          chatId,
-          `❌ NRP/NIP *${digits}* tidak ditemukan. Jika yakin benar, hubungi Opr Humas Polres Anda.`
-        );
-        await waClient.sendMessage(chatId, "Silakan masukkan NRP/NIP lain atau ketik *batal* untuk keluar.");
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   `❌ NRP/NIP *${digits}* tidak ditemukan. Jika yakin benar, hubungi Opr Humas Polres Anda.`
+        // );
+        // await waClient.sendMessage(chatId, "Silakan masukkan NRP/NIP lain atau ketik *batal* untuk keluar.");
       } else {
         session.step = "confirmBindUser";
         session.bindUserId = digits;
-        await waClient.sendMessage(
-          chatId,
-          `NRP/NIP *${digits}* ditemukan. Nomor WhatsApp ini belum terdaftar.\n` +
-            "Apakah Anda ingin menghubungkannya dengan akun tersebut?\n" +
-            "Balas *ya* untuk menghubungkan atau *tidak* untuk membatalkan."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   `NRP/NIP *${digits}* ditemukan. Nomor WhatsApp ini belum terdaftar.\n` +
+        //     "Apakah Anda ingin menghubungkannya dengan akun tersebut?\n" +
+        //     "Balas *ya* untuk menghubungkan atau *tidak* untuk membatalkan."
+        // );
         return;
       }
     } catch (err) {
-      await waClient.sendMessage(chatId, `❌ Gagal mengambil data: ${err.message}`);
-      await waClient.sendMessage(chatId, "Silakan masukkan NRP/NIP lain atau ketik *batal* untuk keluar.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, `❌ Gagal mengambil data: ${err.message}`);
+      // await waClient.sendMessage(chatId, "Silakan masukkan NRP/NIP lain atau ketik *batal* untuk keluar.");
     }
   },
 
@@ -208,32 +221,36 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
       await saveContactIfNew(formatToWhatsAppId(waNum));
       const user = await userModel.findUserById(user_id);
       session.isDitbinmas = !!user.ditbinmas;
-      await waClient.sendMessage(
-        chatId,
-        `✅ Nomor WhatsApp telah dihubungkan ke NRP/NIP *${user_id}*. Berikut datanya:\n` +
-          formatUserReport(user)
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   `✅ Nomor WhatsApp telah dihubungkan ke NRP/NIP *${user_id}*. Berikut datanya:\n` +
+      //     formatUserReport(user)
+      // );
       session.identityConfirmed = true;
       session.user_id = user_id;
       session.step = "tanyaUpdateMyData";
-      await waClient.sendMessage(
-        chatId,
-        "Apakah Anda ingin melakukan perubahan data?\nBalas *ya* jika ingin update data, *tidak* untuk keluar, atau *batal* untuk menutup sesi."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "Apakah Anda ingin melakukan perubahan data?\nBalas *ya* jika ingin update data, *tidak* untuk keluar, atau *batal* untuk menutup sesi."
+      // );
       return;
     }
     if (answer === "tidak") {
-      await waClient.sendMessage(
-        chatId,
-        "Nomor WhatsApp ini tetap tidak terhubung dengan NRP/NIP. Jika ingin mencoba lagi, ketik *userrequest* atau hubungi operator bila membutuhkan bantuan."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "Nomor WhatsApp ini tetap tidak terhubung dengan NRP/NIP. Jika ingin mencoba lagi, ketik *userrequest* atau hubungi operator bila membutuhkan bantuan."
+      // );
       session.exit = true;
       return;
     }
-    await waClient.sendMessage(
-      chatId,
-      "Balas *ya* untuk menghubungkan nomor, atau *tidak* untuk membatalkan."
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   "Balas *ya* untuk menghubungkan nomor, atau *tidak* untuk membatalkan."
+    // );
   },
 
   confirmBindUpdate: async (session, chatId, text, waClient, pool, userModel) => {
@@ -243,25 +260,29 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
       const nrp = session.updateUserId;
       await userModel.updateUserField(nrp, "whatsapp", waNum);
       await saveContactIfNew(formatToWhatsAppId(waNum));
-      await waClient.sendMessage(chatId, `✅ Nomor berhasil dihubungkan ke NRP/NIP *${nrp}*.`);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, `✅ Nomor berhasil dihubungkan ke NRP/NIP *${nrp}*.`);
       session.identityConfirmed = true;
       session.user_id = nrp;
       session.step = "updateAskField";
-      await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
       return;
     }
     if (ans === "tidak") {
-      await waClient.sendMessage(
-        chatId,
-        "Nomor WhatsApp ini tidak dihubungkan ke NRP/NIP. Ketik *userrequest* untuk kembali ke menu atau hubungi operator bila membutuhkan bantuan."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "Nomor WhatsApp ini tidak dihubungkan ke NRP/NIP. Ketik *userrequest* untuk kembali ke menu atau hubungi operator bila membutuhkan bantuan."
+      // );
       session.exit = true;
       return;
     }
-    await waClient.sendMessage(
-      chatId,
-      "Balas *ya* untuk menghubungkan nomor, atau *tidak* untuk membatalkan."
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   "Balas *ya* untuk menghubungkan nomor, atau *tidak* untuk membatalkan."
+    // );
   },
 
   // --- Pilih field update
@@ -282,15 +303,17 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
     const maxOption = allowedFields.length;
     if (lower === "batal") {
       session.exit = true;
-      await waClient.sendMessage(chatId, "✅ Menu ditutup. Terima kasih.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "✅ Menu ditutup. Terima kasih.");
       return;
     }
     if (!new RegExp(`^[1-${maxOption}]$`).test(lower)) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ Pilihan tidak valid. Balas dengan angka sesuai daftar (contoh: 1) atau ketik *batal* untuk keluar."
-      );
-      await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+      //   chatId,
+      //   "❌ Pilihan tidak valid. Balas dengan angka sesuai daftar (contoh: 1) atau ketik *batal* untuk keluar."
+      // );
+      // await waClient.sendMessage(chatId, formatFieldList(session.isDitbinmas));
       return;
     }
 
@@ -308,11 +331,12 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
           .join("\n");
         // Simpan list pangkat di session agar bisa dipakai saat validasi
         session.availableTitles = sorted;
-        await waClient.sendMessage(chatId, "Daftar pangkat yang dapat dipilih:\n" + msgList);
-        await waClient.sendMessage(
-          chatId,
-          "Balas dengan angka dari daftar atau ketik nama pangkat persis. Ketik *batal* untuk membatalkan."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(chatId, "Daftar pangkat yang dapat dipilih:\n" + msgList);
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "Balas dengan angka dari daftar atau ketik nama pangkat persis. Ketik *batal* untuk membatalkan."
+        // );
       }
     }
     if (field === "satfung") {
@@ -328,14 +352,15 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
         const sorted = sortDivisionKeys(satfung);
         let msgList = sorted.map((s, i) => `${i + 1}. ${s}`).join("\n");
         session.availableSatfung = sorted;
-        await waClient.sendMessage(
-          chatId,
-          "Daftar satfung yang dapat dipilih:\n" + msgList
-        );
-        await waClient.sendMessage(
-          chatId,
-          "Balas dengan angka dari daftar atau ketik nama satfung persis. Ketik *batal* untuk membatalkan."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "Daftar satfung yang dapat dipilih:\n" + msgList
+        // );
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "Balas dengan angka dari daftar atau ketik nama satfung persis. Ketik *batal* untuk membatalkan."
+        // );
       }
     }
     session.step = "updateAskValue";
@@ -347,17 +372,19 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
     else if (field === "tiktok")
       extra = " (masukkan link profil atau username TikTok)";
 
-    await waClient.sendMessage(
-      chatId,
-      `Ketik nilai baru untuk field *${allowedFields[idx].label}*${extra}. Balas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   `Ketik nilai baru untuk field *${allowedFields[idx].label}*${extra}. Balas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`
+    // );
   },
 
   updateAskValue: async (session, chatId, text, waClient, pool, userModel) => {
     const lower = text.trim().toLowerCase();
     if (lower === "batal") {
       session.exit = true;
-      await waClient.sendMessage(chatId, "Perubahan dibatalkan. Ketik *userrequest* untuk memulai lagi.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "Perubahan dibatalkan. Ketik *userrequest* untuk memulai lagi.");
       return;
     }
     const user_id = session.updateUserId;
@@ -378,12 +405,14 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
           value = titles[idx];
         } else {
           const msgList = titles.map((t, i) => `${i + 1}. ${t}`).join("\n");
-          await waClient.sendMessage(chatId, `❌ Pangkat tidak valid! Pilih sesuai daftar:\n${msgList}`);
+          // WhatsApp functionality removed
+          // await waClient.sendMessage(chatId, `❌ Pangkat tidak valid! Pilih sesuai daftar:\n${msgList}`);
           return;
         }
       } else if (!normalizedTitles.includes(value.toUpperCase())) {
         const msgList = titles.map((t, i) => `${i + 1}. ${t}`).join("\n");
-        await waClient.sendMessage(chatId, `❌ Pangkat tidak valid! Pilih sesuai daftar:\n${msgList}`);
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(chatId, `❌ Pangkat tidak valid! Pilih sesuai daftar:\n${msgList}`);
         return;
       }
     }
@@ -403,18 +432,20 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
           value = satfungList[idx];
         } else {
           const msgList = satfungList.map((s, i) => `${i + 1}. ${s}`).join("\n");
-          await waClient.sendMessage(
-            chatId,
-            `❌ Satfung tidak valid! Pilih sesuai daftar:\n${msgList}`
-          );
+          // WhatsApp functionality removed
+          // await waClient.sendMessage(
+          //   chatId,
+          //   `❌ Satfung tidak valid! Pilih sesuai daftar:\n${msgList}`
+          // );
           return;
         }
       } else if (!normalizedSatfung.includes(value.toUpperCase())) {
         const msgList = satfungList.map((s, i) => `${i + 1}. ${s}`).join("\n");
-        await waClient.sendMessage(
-          chatId,
-          `❌ Satfung tidak valid! Pilih sesuai daftar:\n${msgList}`
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   `❌ Satfung tidak valid! Pilih sesuai daftar:\n${msgList}`
+        // );
         return;
       }
     }
@@ -423,26 +454,29 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
         /^(?:https?:\/\/(?:www\.)?instagram\.com\/)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
       );
       if (!igMatch) {
-        await waClient.sendMessage(
-          chatId,
-          "❌ Input Instagram tidak valid! Masukkan *link profil* atau *username Instagram* (contoh: https://www.instagram.com/username atau @username)"
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "❌ Input Instagram tidak valid! Masukkan *link profil* atau *username Instagram* (contoh: https://www.instagram.com/username atau @username)"
+        // );
         return;
       }
       value = igMatch[1].toLowerCase();
       if (value === "cicero_devs") {
-        await waClient.sendMessage(
-          chatId,
-          "❌ Instagram tersebut adalah milik Super Admin. Gunakan akun Instagram Anda sendiri."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "❌ Instagram tersebut adalah milik Super Admin. Gunakan akun Instagram Anda sendiri."
+        // );
         return;
       }
       const existing = await userModel.findUserByInsta(value);
       if (existing && existing.user_id !== user_id) {
-        await waClient.sendMessage(
-          chatId,
-          "❌ Akun Instagram tersebut sudah terdaftar pada pengguna lain."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "❌ Akun Instagram tersebut sudah terdaftar pada pengguna lain."
+        // );
         return;
       }
     }
@@ -451,19 +485,21 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
         /^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
       );
       if (!ttMatch) {
-        await waClient.sendMessage(
-          chatId,
-          "❌ Input TikTok tidak valid! Masukkan *link profil* atau *username TikTok* (contoh: https://www.tiktok.com/@username atau @username)"
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "❌ Input TikTok tidak valid! Masukkan *link profil* atau *username TikTok* (contoh: https://www.tiktok.com/@username atau @username)"
+        // );
         return;
       }
       value = ttMatch[1].toLowerCase();
       const existing = await userModel.findUserByTiktok(value);
       if (existing && existing.user_id !== user_id) {
-        await waClient.sendMessage(
-          chatId,
-          "❌ Akun TikTok tersebut sudah terdaftar pada pengguna lain."
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+        //   chatId,
+        //   "❌ Akun TikTok tersebut sudah terdaftar pada pengguna lain."
+        // );
         return;
       }
     }
@@ -476,18 +512,19 @@ Balas *ya* jika benar, *tidak* jika bukan, atau *batal* untuk menutup sesi.
     }
     const displayValue =
       field === "insta" || field === "tiktok" ? `@${value}` : value;
-    await waClient.sendMessage(
-      chatId,
-      `✅ Data *${
-        field === "title"
-          ? "pangkat"
-          : field === "divisi"
-          ? "satfung"
-          : field === "desa"
-          ? "desa binaan"
-          : field
-      }* untuk NRP ${user_id} berhasil diupdate menjadi *${displayValue}*.`
-    );
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(
+    //   chatId,
+    //   `✅ Data *${
+    //     field === "title"
+    //       ? "pangkat"
+    //       : field === "divisi"
+    //       ? "satfung"
+    //       : field === "desa"
+    //       ? "desa binaan"
+    //       : field
+    //   }* untuk NRP ${user_id} berhasil diupdate menjadi *${displayValue}*.`
+    // );
     delete session.availableTitles;
     delete session.availableSatfung;
     await userMenuHandlers.main(session, chatId, "", waClient, pool, userModel);

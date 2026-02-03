@@ -1,14 +1,7 @@
 import { query } from '../repository/db.js';
 import { expireSubscription } from './dashboardSubscriptionService.js';
-import { sendWithClientFallback, formatToWhatsAppId } from '../utils/waHelper.js';
-import waClient, { waGatewayClient, waUserClient } from './waService.js';
 
 const DEFAULT_TIMEZONE = 'Asia/Jakarta';
-const waFallbackClients = [
-  { client: waGatewayClient, label: 'WA-GATEWAY' },
-  { client: waClient, label: 'WA' },
-  { client: waUserClient, label: 'WA-USER' },
-];
 
 export function selectExpiredSubscriptions(subscriptions = [], now = new Date()) {
   const nowTs = new Date(now).getTime();
@@ -43,34 +36,6 @@ function buildExpiryMessage(subscription) {
   ].join('\n');
 }
 
-function normalizeWhatsapp(rawValue) {
-  if (!rawValue) return null;
-  const digits = String(rawValue).replace(/\D/g, '');
-  if (!digits) return null;
-  try {
-    return formatToWhatsAppId(digits);
-  } catch (err) {
-    return null;
-  }
-}
-
-async function notifyExpiry(subscription) {
-  const chatId = normalizeWhatsapp(subscription.whatsapp);
-  if (!chatId) return false;
-
-  const message = buildExpiryMessage(subscription);
-  return sendWithClientFallback({
-    chatId,
-    message,
-    clients: waFallbackClients,
-    reportClient: waClient,
-    reportContext: {
-      source: 'dashboardSubscriptionExpiry',
-      subscriptionId: subscription.subscription_id,
-    },
-  });
-}
-
 export async function fetchActiveSubscriptions() {
   const { rows } = await query(
     `SELECT s.subscription_id,
@@ -97,7 +62,6 @@ export async function processExpiredSubscriptions(now = new Date()) {
     try {
       const result = await expireSubscription(subscription.subscription_id, subscription.expires_at);
       if (!result) continue;
-      await notifyExpiry(subscription);
       successCount += 1;
     } catch (err) {
       console.error(

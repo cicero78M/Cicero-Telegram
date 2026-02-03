@@ -7,16 +7,7 @@ import jwt from 'jsonwebtoken';
 const mockQuery = jest.fn();
 const mockRedis = { sAdd: jest.fn(), set: jest.fn(), sMembers: jest.fn(), del: jest.fn() };
 const mockInsertLoginLog = jest.fn();
-const mockWAClient = {
-  info: {},
-  sendMessage: jest.fn(),
-  getState: jest.fn().mockResolvedValue('CONNECTED'),
-  once: jest.fn(),
-  off: jest.fn(),
-};
-const mockQueueAdminNotification = jest.fn();
 const mockGetPremiumSnapshot = jest.fn();
-const actualWaHelper = await import('../src/utils/waHelper.js');
 
 jest.unstable_mockModule('../src/db/index.js', () => ({
   query: mockQuery
@@ -29,18 +20,6 @@ jest.unstable_mockModule('../src/config/redis.js', () => ({
 jest.unstable_mockModule('../src/model/loginLogModel.js', () => ({
   insertLoginLog: mockInsertLoginLog,
   getLoginLogs: jest.fn()
-}));
-
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  ...actualWaHelper,
-  getAdminWAIds: () => ['admin@c.us'],
-  formatToWhatsAppId: (nohp) => `${nohp}@c.us`
-}));
-
-jest.unstable_mockModule('../src/service/waService.js', () => ({
-  default: mockWAClient,
-  waitForWaReady: () => Promise.resolve(),
-  queueAdminNotification: mockQueueAdminNotification,
 }));
 
 jest.unstable_mockModule('../src/service/dashboardSubscriptionService.js', () => ({
@@ -72,8 +51,6 @@ beforeEach(() => {
   mockRedis.sMembers.mockResolvedValue([]);
   mockRedis.del.mockResolvedValue(1);
   mockInsertLoginLog.mockReset();
-  mockWAClient.sendMessage.mockReset();
-  mockQueueAdminNotification.mockReset();
   mockGetPremiumSnapshot.mockReset();
   mockGetPremiumSnapshot.mockResolvedValue({
     premiumStatus: false,
@@ -325,17 +302,6 @@ describe('POST /dashboard-register', () => {
         expect.stringContaining('INSERT INTO dashboard_user_clients'),
         [expect.any(String), 'c1']
       );
-      expect(mockWAClient.sendMessage).toHaveBeenCalledTimes(2);
-      expect(mockWAClient.sendMessage).toHaveBeenCalledWith(
-        'admin@c.us',
-        expect.stringContaining('Permintaan User Approval'),
-        {}
-      );
-      expect(mockWAClient.sendMessage).toHaveBeenCalledWith(
-        '628121234@c.us',
-        expect.stringContaining('Permintaan registrasi dashboard Anda telah diterima'),
-        {}
-      );
   });
 
   test('accepts single client_id field', async () => {
@@ -373,7 +339,6 @@ describe('POST /dashboard-register', () => {
     expect(mockQuery.mock.calls[1][0]).toContain('FROM roles');
     expect(mockQuery.mock.calls[1][1]).toEqual(['ditbinmas']);
     expect(mockQuery.mock.calls[2][1][3]).toBe(5);
-    expect(mockWAClient.sendMessage).toHaveBeenCalledTimes(2);
   });
 
   test('creates default role when missing', async () => {
@@ -711,9 +676,6 @@ describe('POST /user-login', () => {
       loginType: 'user',
       loginSource: 'mobile'
     });
-    expect(mockQueueAdminNotification).toHaveBeenCalledWith(
-      expect.stringContaining('Login user: u1 - User')
-    );
   });
 
   test('logs in user using password field', async () => {
@@ -742,14 +704,11 @@ describe('POST /user-login', () => {
       loginType: 'user',
       loginSource: 'mobile'
     });
-    expect(mockQueueAdminNotification).toHaveBeenCalledWith(
-      expect.stringContaining('Login user: u2 - User2')
-    );
   });
 });
 
 describe('POST /dashboard-password-reset/request', () => {
-  test('creates reset request and sends WhatsApp message', async () => {
+  test('creates reset request', async () => {
     mockQuery
       .mockResolvedValueOnce({
         rows: [
@@ -779,7 +738,7 @@ describe('POST /dashboard-password-reset/request', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       success: true,
-      message: 'Instruksi reset password telah dikirim melalui WhatsApp.',
+      message: 'Permintaan reset password telah diterima. Silakan hubungi admin untuk mendapatkan token reset.',
     });
     expect(mockQuery).toHaveBeenNthCalledWith(
       1,
@@ -796,15 +755,6 @@ describe('POST /dashboard-password-reset/request', () => {
         expect.any(Date),
       ],
     );
-    expect(mockWAClient.sendMessage).toHaveBeenCalledTimes(1);
-    const [wid, message, options] = mockWAClient.sendMessage.mock.calls[0];
-    expect(wid).toBe('628123456789@c.us');
-    expect(options).toEqual({});
-    expect(message).toContain('Reset Password Dashboard');
-    expect(message).toContain('https://papiqo.com/reset-password?token=');
-    expect(message).toContain('Dengan url https://papiqo.com/reset-password');
-    expect(message).toContain('Copy');
-    expect(mockQueueAdminNotification).not.toHaveBeenCalled();
   });
 
   test('rejects when contact does not match stored whatsapp', async () => {
@@ -830,14 +780,12 @@ describe('POST /dashboard-password-reset/request', () => {
     expect(res.body.success).toBe(false);
     expect(res.body.message).toBe('kontak tidak sesuai dengan data pengguna');
     expect(mockQuery).toHaveBeenCalledTimes(2);
-    expect(mockWAClient.sendMessage).not.toHaveBeenCalled();
   });
 
   test.each([
     ['/api/auth/password-reset/request'],
     ['/api/password-reset/request'],
   ])('alias route %s returns the same response as dashboard endpoint', async (aliasPath) => {
-    mockWAClient.sendMessage.mockResolvedValue(true);
     const userRow = {
       dashboard_user_id: 'du1',
       username: 'operator',
@@ -869,7 +817,6 @@ describe('POST /dashboard-password-reset/request', () => {
 
     expect(aliasResponse.status).toBe(dashboardResponse.status);
     expect(aliasResponse.body).toEqual(dashboardResponse.body);
-    expect(mockWAClient.sendMessage).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -2,7 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { scheduleCronJob } from "../utils/cronScheduler.js";
-import waClient, { waGatewayClient, waUserClient } from "../service/waService.js";
+// WhatsApp functionality removed
+// import waClient, { waGatewayClient, waUserClient } from "../service/waService.js";
 import { findAllActiveClientsWithSosmed } from "../model/clientModel.js";
 import { getInstaPostCount, getTiktokPostCount } from "../service/postCountService.js";
 import { fetchAndStoreInstaContent } from "../handler/fetchpost/instaFetchPost.js";
@@ -10,7 +11,8 @@ import { handleFetchLikesInstagram } from "../handler/fetchengagement/fetchLikes
 import { fetchAndStoreTiktokContent } from "../handler/fetchpost/tiktokFetchPost.js";
 import { handleFetchKomentarTiktokBatch } from "../handler/fetchengagement/fetchCommentTiktok.js";
 import { generateSosmedTaskMessage } from "../handler/fetchabsensi/sosmedTask.js";
-import { getAdminWAIds, sendWithClientFallback } from "../utils/waHelper.js";
+// WhatsApp functionality removed
+// import { getAdminWAIds, sendWithClientFallback } from "../utils/waHelper.js";
 import { sendDebug } from "../middleware/debugHandler.js";
 import { getShortcodesTodayByClient } from "../model/instaPostModel.js";
 import { getVideoIdsTodayByClient } from "../model/tiktokPostModel.js";
@@ -18,18 +20,20 @@ import { getVideoIdsTodayByClient } from "../model/tiktokPostModel.js";
 const LOG_TAG = "CRON DIRFETCH SOSMED";
 
 const lastStateByClient = new Map();
-const adminRecipients = new Set(getAdminWAIds());
+// WhatsApp functionality removed
+// const adminRecipients = new Set(getAdminWAIds());
 let isFetchInFlight = false;
 let rerunScheduled = false;
 let pendingRun = false;
 let pendingRunCount = 0;
 let pendingRunOptions = null;
 let pendingRunRequestedAt = null;
-const waFallbackClients = [
-  { client: waGatewayClient, label: "WA-GATEWAY" },
-  { client: waClient, label: "WA" },
-  { client: waUserClient, label: "WA-USER" },
-];
+// WhatsApp functionality removed
+// const waFallbackClients = [
+//   { client: waGatewayClient, label: "WA-GATEWAY" },
+//   { client: waClient, label: "WA" },
+//   { client: waUserClient, label: "WA-USER" },
+// ];
 
 function getCurrentJakartaTime(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -72,21 +76,18 @@ export function normalizeGroupId(groupId) {
   return /^\d{10,22}@g\.us$/.test(candidate) ? candidate.toLowerCase() : null;
 }
 
-export function getRecipientsForClient(client) {
-  const recipients = new Set();
-
-  if (client?.client_status === false) {
-    return recipients;
-  }
-
-  const waGroup = normalizeGroupId(client?.client_group);
-
-  if (waGroup) {
-    recipients.add(waGroup);
-  }
-
-  return recipients;
-}
+// WhatsApp functionality removed
+// export function getRecipientsForClient(client) {
+//   const recipients = new Set();
+//   if (client?.client_status === false) {
+//     return recipients;
+//   }
+//   const waGroup = normalizeGroupId(client?.client_group);
+//   if (waGroup) {
+//     recipients.add(waGroup);
+//   }
+//   return recipients;
+// }
 
 function buildLogEntry({
   phase,
@@ -160,6 +161,8 @@ function formatCountsDelta(countsBefore, countsAfter) {
   return parts.length > 0 ? parts.join(" | ") : null;
 }
 
+// WhatsApp functionality removed - unused function kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 function formatAdminLogMessage(entry) {
   if (!entry) return null;
   if (typeof entry === "string") return `[${LOG_TAG}] ${entry}`.trim();
@@ -204,26 +207,27 @@ function hasLinkDifference(prevLinks = [], nextLinks = []) {
   return false;
 }
 
-async function sendAdminLog(entry) {
-  if (!entry || adminRecipients.size === 0) return;
-  const text = formatAdminLogMessage(entry);
-  if (!text) return;
-
-  for (const admin of adminRecipients) {
-    await sendWithClientFallback({
-      chatId: admin,
-      message: text.trim(),
-      clients: waFallbackClients,
-      reportClient: waClient,
-      reportContext: { tag: LOG_TAG, admin },
-    });
-  }
-}
+// WhatsApp functionality removed
+// async function sendAdminLog(entry) {
+//   if (!entry || adminRecipients.size === 0) return;
+//   const text = formatAdminLogMessage(entry);
+//   if (!text) return;
+//   for (const admin of adminRecipients) {
+//     await sendWithClientFallback({
+//       chatId: admin,
+//       message: text.trim(),
+//       clients: waFallbackClients,
+//       reportClient: waClient,
+//       reportContext: { tag: LOG_TAG, admin },
+//     });
+//   }
+// }
 
 async function sendStructuredLog(entry) {
   const payload = typeof entry === "string" ? buildLogEntry({ message: entry }) : entry;
   sendDebug({ tag: LOG_TAG, msg: payload });
-  await sendAdminLog(payload);
+  // WhatsApp functionality removed - admin logging disabled
+  // await sendAdminLog(payload);
 }
 
 async function ensureClientState(clientId) {
@@ -479,6 +483,7 @@ export async function runCron(options = {}) {
             countsBefore,
           })
         );
+        // eslint-disable-next-line no-unused-vars
         const { text, igCount, tiktokCount, state } = await generateSosmedTaskMessage(
           clientId,
           {
@@ -504,7 +509,9 @@ export async function runCron(options = {}) {
           })
         );
 
-        const recipients = getRecipientsForClient(client);
+        // WhatsApp functionality removed - recipient collection and message sending disabled
+        // const recipients = getRecipientsForClient(client);
+        // eslint-disable-next-line no-unused-vars
         const hasNewCounts =
           igCount !== previousState.igCount || tiktokCount !== previousState.tiktokCount;
 
@@ -516,12 +523,15 @@ export async function runCron(options = {}) {
             state?.tiktokVideoIds ?? previousTiktokVideoIds ?? previousState.tiktokVideoIds,
         };
 
+        // eslint-disable-next-line no-unused-vars
         const hasLinkChanges =
           hasLinkDifference(previousState.igShortcodes, nextState.igShortcodes) ||
           hasLinkDifference(previousState.tiktokVideoIds, nextState.tiktokVideoIds);
 
         lastStateByClient.set(clientId, nextState);
 
+        // WhatsApp functionality removed - all sending logic disabled
+        /*
         if (!hasNewCounts && !hasLinkChanges) {
           await sendStructuredLog(
             buildLogEntry({
@@ -606,6 +616,7 @@ export async function runCron(options = {}) {
             message: `Laporan dikirim ke ${recipients.size} penerima`,
           })
         );
+        */
       } catch (clientErr) {
         const clientId = String(client?.client_id || "").trim().toUpperCase();
         const errorMeta = {

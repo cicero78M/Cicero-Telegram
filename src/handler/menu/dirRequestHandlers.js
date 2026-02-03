@@ -26,9 +26,10 @@ import {
 import { absensiRegistrasiDashboardDirektorat } from "../fetchabsensi/dashboard/absensiRegistrasiDashboardDirektorat.js";
 import { findClientById } from "../../service/clientService.js";
 import { getGreeting, sortDivisionKeys, formatNama } from "../../utils/utilsHelper.js";
-import { sendWAFile, safeSendMessage, sendWithClientFallback } from "../../utils/waHelper.js";
+// WhatsApp functionality removed
+// import { sendWAFile, safeSendMessage, sendWithClientFallback } from "../../utils/waHelper.js";
 import { writeFile, mkdir, readFile, unlink, stat } from "fs/promises";
-import { join, basename } from "path";
+import { join } from "path";
 import {
   saveLikesRecapExcel,
   saveLikesRecapPerContentExcel,
@@ -66,36 +67,36 @@ import { generateInstagramAllDataRecap } from "../../service/instagramAllDataRec
 import { generateTiktokAllDataRecap } from "../../service/tiktokAllDataRecapService.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
 
-const dirRequestGroup = "120363419830216549@g.us";
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
 
-const isGroupChatId = (value) => String(value || "").trim().endsWith("@g.us");
-
-const sendMenuMessage = async (waClient, chatId, message, options = {}) => {
-  const {
-    fallbackClients,
-    fallbackContext,
-    reportClient,
-    ...sendOptions
-  } = options || {};
-  if (Array.isArray(fallbackClients) && fallbackClients.length) {
-    return sendWithClientFallback({
-      chatId,
-      message,
-      clients: fallbackClients,
-      sendOptions,
-      reportClient: reportClient || waClient,
-      reportContext: fallbackContext,
-    });
-  }
-  if (isGroupChatId(chatId)) {
-    return safeSendMessage(waClient, chatId, message, sendOptions);
-  }
-  if (!sendOptions || Object.keys(sendOptions).length === 0) {
-    return waClient.sendMessage(chatId, message);
-  }
-  return waClient.sendMessage(chatId, message, sendOptions);
-};
+// WhatsApp functionality removed - sendMenuMessage disabled
+// const sendMenuMessage = async (waClient, chatId, message, options = {}) => {
+//   const {
+//     fallbackClients,
+//     fallbackContext,
+//     reportClient,
+//     ...sendOptions
+//   } = options || {};
+//   if (Array.isArray(fallbackClients) && fallbackClients.length) {
+//     return sendWithClientFallback({
+//       chatId,
+//       message,
+//       clients: fallbackClients,
+//       sendOptions,
+//       reportClient: reportClient || waClient,
+//       reportContext: fallbackContext,
+//     });
+//   }
+//   if (isGroupChatId(chatId)) {
+//     return safeSendMessage(waClient, chatId, message, sendOptions);
+//   }
+//   if (!sendOptions || Object.keys(sendOptions).length === 0) {
+ // WhatsApp functionality removed
+// //     return waClient.sendMessage(chatId, message);
+//   }
+ // WhatsApp functionality removed
+// //   return waClient.sendMessage(chatId, message, sendOptions);
+// };
 
 const isDitbinmas = (value) =>
   String(value || "")
@@ -171,14 +172,8 @@ const DIGIT_EMOJI = {
   "9": "9️⃣",
 };
 
-const ENGAGEMENT_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih periode rekap ranking engagement jajaran:\n" +
-    Object.entries(ENGAGEMENT_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
+// WhatsApp functionality removed - menu text kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 const KASATKER_REPORT_MENU_TEXT = appendSubmenuBackInstruction(
   "Silakan pilih periode Laporan Kasatker:\n" +
     Object.entries(KASATKER_REPORT_PERIOD_MAP)
@@ -202,22 +197,6 @@ const KASAT_BINMAS_LIKES_PERIOD_MAP = {
   },
 };
 
-const KASAT_BINMAS_LIKES_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Absensi Likes Kasat Binmas:\n" +
-    Object.entries(KASAT_BINMAS_LIKES_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Likes Instagram Kasat Binmas (Excel):\n" +
-    Object.entries(KASAT_BINMAS_LIKES_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
 const KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP = {
   "1": {
     period: "daily",
@@ -233,22 +212,6 @@ const KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP = {
   },
 };
 
-const KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Absensi Komentar TikTok Kasat Binmas:\n" +
-    Object.entries(KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Komentar TikTok Kasat Binmas (Excel):\n" +
-    Object.entries(KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
 const SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP = {
   "1": {
     period: "daily",
@@ -263,49 +226,6 @@ const SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP = {
     description: "Rekap bulanan (1 s/d akhir bulan)",
   },
 };
-
-const SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Instagram Satbinmas Official:\n" +
-    Object.entries(SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap TikTok Satbinmas Official:\n" +
-    Object.entries(SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const SATBINMAS_OFFICIAL_METADATA_PROMPT = (clientId) =>
-  "🔎 *Monitoring Satbinmas Official*\n" +
-  "Masukkan username Instagram Satbinmas Official yang ingin dicek. " +
-  "Secara default akan memakai Client ID aktif (" +
-  `${clientId || DITBINMAS_CLIENT_ID}).\n` +
-  "Format balasan: `username` atau `CLIENT_ID username`.\n" +
-  "Contoh: `satbinmas_official` atau `MKS01 satbinmas_official`.\n\n" +
-  "Balas *batal* untuk kembali ke menu.";
-
-const SATBINMAS_OFFICIAL_TIKTOK_SECUID_PROMPT = () =>
-  "🎯 *Sinkronisasi secUid TikTok Satbinmas Official*\n" +
-  "Bot akan mengambil seluruh username TikTok Satbinmas Official dari tabel `satbinmas_official_accounts` " +
-  "untuk semua client bertipe ORG, lalu menyinkronkan secUid lewat RapidAPI TikTok secara berurutan.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali ke menu.";
-
-const SATBINMAS_OFFICIAL_MEDIA_PROMPT =
-  "📸 *Ambil Konten Harian Satbinmas Official*\n" +
-  "Bot otomatis mengambil seluruh akun Instagram Satbinmas Official aktif " +
-  "untuk seluruh client bertipe ORG secara berurutan dengan jeda agar tetap mematuhi TOS RapidAPI.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali.";
-
-const SATBINMAS_OFFICIAL_TIKTOK_MEDIA_PROMPT =
-  "🎵 *Ambil Konten Harian TikTok Satbinmas Official*\n" +
-  "Bot otomatis mengambil seluruh akun TikTok Satbinmas Official aktif " +
-  "untuk semua client bertipe ORG secara berurutan dengan jeda aman agar tidak melanggar rate limit RapidAPI.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali.";
 
 const pangkatOrder = [
   "KOMISARIS BESAR POLISI",
@@ -1661,6 +1581,7 @@ async function performAction(
 ) {
   let msg = "";
   const { fallbackClients, fallbackContext } = fallbackOptions;
+  // eslint-disable-next-line no-unused-vars
   const fallbackPayload = fallbackClients
     ? { fallbackClients, fallbackContext, reportClient: waClient }
     : {};
@@ -1687,14 +1608,16 @@ async function performAction(
           roleFlag,
           username: context.username,
         });
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
-        await sendWAFile(
-          waClient,
-          buffer,
-          basename(filePath),
-          chatId,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
+        // WhatsApp functionality removed
+        // await sendWAFile(
+          // waClient,
+          // buffer,
+          // basename(filePath),
+          // chatId,
+          // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        // );
         await unlink(filePath);
         msg = "✅ File Excel dikirim.";
       } catch (error) {
@@ -1877,25 +1800,30 @@ async function performAction(
         const dirPath = "laphar";
         await mkdir(dirPath, { recursive: true });
         if (narrative) {
-          await sendMenuMessage(waClient, chatId, narrative.trim(), fallbackPayload);
+          // WhatsApp functionality removed
+          // await sendMenuMessage(waClient, chatId, narrative.trim(), fallbackPayload);
         }
         if (text && filename) {
           const buffer = Buffer.from(text, "utf-8");
           const filePath = join(dirPath, filename);
           await writeFile(filePath, buffer);
-          await sendWAFile(waClient, buffer, filename, chatId, "text/plain");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, buffer, filename, chatId, "text/plain");
         }
         if (textBelum && filenameBelum) {
           const bufferBelum = Buffer.from(textBelum, "utf-8");
           const filePathBelum = join(dirPath, filenameBelum);
           await writeFile(filePathBelum, bufferBelum);
-          await sendWAFile(waClient, bufferBelum, filenameBelum, chatId, "text/plain");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, bufferBelum, filenameBelum, chatId, "text/plain");
         }
         const recapData = await collectLikesRecap(clientId);
         if (recapData.shortcodes.length) {
           const excelPath = await saveLikesRecapExcel(recapData, clientId);
+          // eslint-disable-next-line no-unused-vars
           const bufferExcel = await readFile(excelPath);
-          await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           await unlink(excelPath);
         }
         return;
@@ -1905,25 +1833,30 @@ async function performAction(
         const dirPath = "laphar";
         await mkdir(dirPath, { recursive: true });
         if (narrative) {
-          await sendMenuMessage(waClient, chatId, narrative.trim(), fallbackPayload);
+          // WhatsApp functionality removed
+          // await sendMenuMessage(waClient, chatId, narrative.trim(), fallbackPayload);
         }
         if (text && filename) {
           const buffer = Buffer.from(text, "utf-8");
           const filePath = join(dirPath, filename);
           await writeFile(filePath, buffer);
-          await sendWAFile(waClient, buffer, filename, chatId, "text/plain");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, buffer, filename, chatId, "text/plain");
         }
         if (textBelum && filenameBelum) {
           const bufferBelum = Buffer.from(textBelum, "utf-8");
           const filePathBelum = join(dirPath, filenameBelum);
           await writeFile(filePathBelum, bufferBelum);
-          await sendWAFile(waClient, bufferBelum, filenameBelum, chatId, "text/plain");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, bufferBelum, filenameBelum, chatId, "text/plain");
         }
         const recapData = await collectKomentarRecap(clientId);
         if (recapData.videoIds.length) {
           const excelPath = await saveCommentRecapExcel(recapData, clientId);
+          // eslint-disable-next-line no-unused-vars
           const bufferExcel = await readFile(excelPath);
-          await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           await unlink(excelPath);
         }
         return;
@@ -1950,6 +1883,7 @@ async function performAction(
           }
           let buffer;
           try {
+            // eslint-disable-next-line no-unused-vars
             buffer = await readFile(filePath);
           } catch (error) {
             console.error("Gagal membaca file rekap likes Instagram (Excel):", error);
@@ -1957,13 +1891,14 @@ async function performAction(
             break;
           }
           try {
-            await sendWAFile(
-              waClient,
-              buffer,
-              basename(filePath),
-              chatId,
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            );
+            // WhatsApp functionality removed
+            // await sendWAFile(
+              // waClient,
+              // buffer,
+              // basename(filePath),
+              // chatId,
+              // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            // );
             msg = "✅ File Excel dikirim.";
           } catch (error) {
             console.error("Gagal mengirim rekap likes Instagram (Excel):", error);
@@ -1994,14 +1929,16 @@ async function performAction(
           }
           try {
             filePath = await saveCommentRecapExcel(recapData, clientId);
+            // eslint-disable-next-line no-unused-vars
             const buffer = await readFile(filePath);
-            await sendWAFile(
-              waClient,
-              buffer,
-              basename(filePath),
-              chatId,
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            );
+            // WhatsApp functionality removed
+            // await sendWAFile(
+              // waClient,
+              // buffer,
+              // basename(filePath),
+              // chatId,
+              // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            // );
             msg = "✅ File Excel dikirim.";
           } catch (error) {
             console.error("Gagal mengirim rekap komentar TikTok (Excel):", error);
@@ -2045,70 +1982,80 @@ async function performAction(
             }
           );
           if (narrative) {
-            await sendMenuMessage(waClient, chatId, narrative, fallbackPayload);
+            // WhatsApp functionality removed
+            // await sendMenuMessage(waClient, chatId, narrative, fallbackPayload);
           }
           if (ig.text && ig.filename) {
             const buffer = Buffer.from(ig.text, "utf-8");
             const filePath = join(dirPath, ig.filename);
             tempFiles.push(filePath);
             await writeFile(filePath, buffer);
-            await sendWAFile(waClient, buffer, ig.filename, chatId, "text/plain");
+            // WhatsApp functionality removed
+            // await sendWAFile(waClient, buffer, ig.filename, chatId, "text/plain");
           }
           const igRecap = await collectLikesRecap(clientId);
           if (typeof igRecap === "string") {
-            await sendMenuMessage(waClient, chatId, igRecap, fallbackPayload);
+            // WhatsApp functionality removed
+            // await sendMenuMessage(waClient, chatId, igRecap, fallbackPayload);
           } else if (igRecap?.shortcodes?.length) {
             const excelPath = await saveLikesRecapExcel(igRecap, clientId);
             tempFiles.push(excelPath);
+            // eslint-disable-next-line no-unused-vars
             const bufferExcel = await readFile(excelPath);
-            await sendWAFile(
-              waClient,
-              bufferExcel,
-              basename(excelPath),
-              chatId,
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            );
+            // WhatsApp functionality removed
+            // await sendWAFile(
+              // waClient,
+              // bufferExcel,
+              // basename(excelPath),
+              // chatId,
+              // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            // );
           }
           if (tt.text && tt.filename) {
             const buffer = Buffer.from(tt.text, "utf-8");
             const filePath = join(dirPath, tt.filename);
             tempFiles.push(filePath);
             await writeFile(filePath, buffer);
-            await sendWAFile(waClient, buffer, tt.filename, chatId, "text/plain");
+            // WhatsApp functionality removed
+            // await sendWAFile(waClient, buffer, tt.filename, chatId, "text/plain");
           }
           let ttRecap;
           try {
             ttRecap = await collectKomentarRecap(clientId);
           } catch (error) {
             console.error("Gagal menyiapkan rekap komentar TikTok:", error);
-            await sendMenuMessage(
-              waClient,
-              chatId,
-              "❌ Gagal menyiapkan rekap komentar TikTok. Silakan coba lagi.",
-              fallbackPayload
-            );
+            // WhatsApp functionality removed
+            // await sendMenuMessage(
+              // waClient,
+              // chatId,
+              // "❌ Gagal menyiapkan rekap komentar TikTok. Silakan coba lagi.",
+              // fallbackPayload
+            // );
             return;
           }
           if (ttRecap?.videoIds?.length) {
             const excelPath = await saveCommentRecapExcel(ttRecap, clientId);
             tempFiles.push(excelPath);
+            // eslint-disable-next-line no-unused-vars
             const bufferExcel = await readFile(excelPath);
-            await sendWAFile(
-              waClient,
-              bufferExcel,
-              basename(excelPath),
-              chatId,
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            );
+            // WhatsApp functionality removed
+            // await sendWAFile(
+              // waClient,
+              // bufferExcel,
+              // basename(excelPath),
+              // chatId,
+              // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            // );
           }
         } catch (error) {
           console.error("Gagal memproses menu 21:", error);
-          await sendMenuMessage(
-            waClient,
-            chatId,
-            "❌ Terjadi kendala saat memproses menu 21. Silakan coba lagi nanti. Kembali ke menu utama.",
-            fallbackPayload
-          );
+          // WhatsApp functionality removed
+          // await sendMenuMessage(
+            // waClient,
+            // chatId,
+            // "❌ Terjadi kendala saat memproses menu 21. Silakan coba lagi nanti. Kembali ke menu utama.",
+            // fallbackPayload
+          // );
         } finally {
           await Promise.all(
             tempFiles.map(async (filePath) => {
@@ -2137,14 +2084,16 @@ async function performAction(
             period,
           });
           filePath = generatedPath;
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(
-            waClient,
-            buffer,
-            basename(filePath),
-            chatId,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          );
+          // WhatsApp functionality removed
+          // await sendWAFile(
+            // waClient,
+            // buffer,
+            // basename(filePath),
+            // chatId,
+            // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          // );
           msg = `✅ File Excel rekap ranking engagement (${periodLabel}) dikirim.`;
         } catch (error) {
           console.error("Gagal membuat rekap ranking engagement:", error);
@@ -2177,8 +2126,10 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           msg = "✅ File Excel dikirim.";
         } catch (error) {
           console.error("Gagal mengirim file Excel:", error);
@@ -2202,8 +2153,10 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           msg = "✅ File Excel dikirim.";
         } catch (error) {
           console.error("Gagal mengirim file Excel:", error);
@@ -2261,8 +2214,10 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          // WhatsApp functionality removed
+          // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           msg = "✅ File Excel dikirim.";
         } catch (error) {
           console.error("Gagal mengirim file Excel:", error);
@@ -2289,14 +2244,16 @@ async function performAction(
           break;
         }
         const filePath = await saveLikesRecapPerContentExcel(data, clientId);
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
-        await sendWAFile(
-          waClient,
-          buffer,
-          basename(filePath),
-          chatId,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
+        // WhatsApp functionality removed
+        // await sendWAFile(
+          // waClient,
+          // buffer,
+          // basename(filePath),
+          // chatId,
+          // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        // );
         await unlink(filePath);
         msg = "✅ File Excel dikirim.";
         break;
@@ -2308,14 +2265,16 @@ async function performAction(
           break;
         }
         const filePath = await saveCommentRecapPerContentExcel(recapData, clientId);
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
-        await sendWAFile(
-          waClient,
-          buffer,
-          basename(filePath),
-          chatId,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
+        // WhatsApp functionality removed
+        // await sendWAFile(
+          // waClient,
+          // buffer,
+          // basename(filePath),
+          // chatId,
+          // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        // );
         await unlink(filePath);
         msg = "✅ File Excel dikirim.";
         break;
@@ -2444,14 +2403,16 @@ async function performAction(
             roleFlag,
             clientName: client?.nama || clientId,
           });
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(
-            waClient,
-            buffer,
-            basename(filePath),
-            chatId,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          );
+          // WhatsApp functionality removed
+          // await sendWAFile(
+            // waClient,
+            // buffer,
+            // basename(filePath),
+            // chatId,
+            // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          // );
           await unlink(filePath);
           msg = "✅ File Excel Instagram all data dikirim.";
         } catch (error) {
@@ -2473,14 +2434,16 @@ async function performAction(
             roleFlag,
             clientName: client?.nama || clientId,
           });
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
-          await sendWAFile(
-            waClient,
-            buffer,
-            basename(filePath),
-            chatId,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          );
+          // WhatsApp functionality removed
+          // await sendWAFile(
+            // waClient,
+            // buffer,
+            // basename(filePath),
+            // chatId,
+            // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          // );
           await unlink(filePath);
           msg = "✅ File Excel TikTok all data dikirim.";
         } catch (error) {
@@ -2502,18 +2465,21 @@ async function performAction(
     return;
   }
 
-  await sendMenuMessage(waClient, chatId, normalizedMsg, fallbackPayload);
+  // WhatsApp functionality removed
+  // await sendMenuMessage(waClient, chatId, normalizedMsg, fallbackPayload);
   if (action === "12" || action === "14" || action === "16") {
     if (Array.isArray(fallbackClients) && fallbackClients.length) {
-      await sendWithClientFallback({
-        chatId: dirRequestGroup,
-        message: normalizedMsg,
-        clients: fallbackClients,
-        reportClient: waClient,
-        reportContext: fallbackContext,
-      });
+      // WhatsApp functionality removed
+      // await sendWithClientFallback({
+        // chatId: dirRequestGroup,
+        // message: normalizedMsg,
+        // clients: fallbackClients,
+        // reportClient: waClient,
+        // reportContext: fallbackContext,
+      // });
     } else {
-      await safeSendMessage(waClient, dirRequestGroup, normalizedMsg);
+      // WhatsApp functionality removed
+      // await safeSendMessage(waClient, dirRequestGroup, normalizedMsg);
     }
   }
 }
@@ -2567,10 +2533,11 @@ export const dirRequestHandlers = {
     const dashUsers = session.dash_users || [];
     const chosen = dashUsers[0];
     if (!chosen) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ Data dashboard user tidak ditemukan untuk akses dirrequest."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "❌ Data dashboard user tidak ditemukan untuk akses dirrequest."
+      // );
       return;
     }
     session.role = chosen.role;
@@ -2606,6 +2573,7 @@ export const dirRequestHandlers = {
     }
 
     const clientName = session.clientName;
+    // eslint-disable-next-line no-unused-vars
     const menu =
       `Client: *${clientName}*\n` +
       "┏━━━━━━━━━━━━ *MENU DIRREQUEST* ━━━━━━━━━━━━\n" +
@@ -2665,7 +2633,8 @@ export const dirRequestHandlers = {
         "4️⃣1️⃣ Rekap TikTok Satbinmas Official\n\n" +
         "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n" +
         "Ketik *angka* menu atau *batal* untuk keluar.";
-    await waClient.sendMessage(chatId, menu);
+    // WhatsApp functionality removed
+    // await waClient.sendMessage(chatId, menu);
     session.step = "choose_menu";
   },
 
@@ -2679,6 +2648,7 @@ export const dirRequestHandlers = {
       })
       .join("\n");
 
+    // eslint-disable-next-line no-unused-vars
     const prompt =
       "Pilih *Client ID* Direktorat aktif sebelum membuka menu dirrequest:\n" +
       (choiceList || "(Belum ada data client Direktorat aktif)") +
@@ -2703,14 +2673,16 @@ export const dirRequestHandlers = {
     }
 
     if (!input) {
-      await waClient.sendMessage(chatId, prompt);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, prompt);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
       session.menu = null;
       session.step = null;
-      await waClient.sendMessage(chatId, "✅ Menu dirrequest ditutup.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "✅ Menu dirrequest ditutup.");
       return;
     }
 
@@ -2731,11 +2703,13 @@ export const dirRequestHandlers = {
     }
 
     if (!selectedClient) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ Pilihan client tidak valid. Silakan pilih sesuai daftar."
-      );
-      await waClient.sendMessage(chatId, prompt);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "❌ Pilihan client tidak valid. Silakan pilih sesuai daftar."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, prompt);
       return;
     }
 
@@ -2800,12 +2774,14 @@ export const dirRequestHandlers = {
           "45",
         ].includes(choice)
     ) {
-      await waClient.sendMessage(chatId, "Pilihan tidak valid. Ketik angka menu.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "Pilihan tidak valid. Ketik angka menu.");
       return;
     }
     const userClientId = session.selectedClientId;
     if (!userClientId) {
-      await waClient.sendMessage(chatId, "Client belum dipilih.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "Client belum dipilih.");
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -2814,13 +2790,15 @@ export const dirRequestHandlers = {
 
     if (choice === "22") {
       session.step = "choose_engagement_recap_period";
-      await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
       return;
     }
 
     if (choice === "30") {
       session.step = "choose_kasatker_report_period";
-      await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
       return;
     }
 
@@ -2832,25 +2810,29 @@ export const dirRequestHandlers = {
 
     if (choice === "34") {
       session.step = "choose_kasat_binmas_likes_period";
-      await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
       return;
     }
 
     if (choice === "35") {
       session.step = "choose_kasat_binmas_tiktok_comment_period";
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
       return;
     }
 
     if (choice === "44") {
       session.step = "choose_kasat_binmas_likes_excel_period";
-      await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
       return;
     }
 
     if (choice === "45") {
       session.step = "choose_kasat_binmas_tiktok_comment_excel_period";
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
       return;
     }
 
@@ -2900,13 +2882,15 @@ export const dirRequestHandlers = {
 
     if (choice === "40") {
       session.step = "choose_satbinmas_official_instagram_recap_period";
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
       return;
     }
 
     if (choice === "41") {
       session.step = "choose_satbinmas_official_tiktok_recap_period";
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
       return;
     }
 
@@ -2926,12 +2910,14 @@ export const dirRequestHandlers = {
   async choose_engagement_recap_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await waClient.sendMessage(chatId, "✅ Menu rekap ranking engagement ditutup.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "✅ Menu rekap ranking engagement ditutup.");
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -2939,11 +2925,13 @@ export const dirRequestHandlers = {
 
     const option = ENGAGEMENT_RECAP_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 6 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 6 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, ENGAGEMENT_RECAP_MENU_TEXT);
       return;
     }
 
@@ -2957,18 +2945,21 @@ export const dirRequestHandlers = {
         period: option.period,
       });
       filePath = generatedPath;
+      // eslint-disable-next-line no-unused-vars
       const buffer = await readFile(filePath);
-      await sendWAFile(
-        waClient,
-        buffer,
-        basename(filePath),
-        chatId,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
-      await waClient.sendMessage(
-        chatId,
-        `✅ File Excel rekap ranking engagement (${option.label}) dikirim.`
-      );
+      // WhatsApp functionality removed
+      // await sendWAFile(
+        // waClient,
+        // buffer,
+        // basename(filePath),
+        // chatId,
+        // "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // `✅ File Excel rekap ranking engagement (${option.label}) dikirim.`
+      // );
     } catch (error) {
       console.error("Gagal membuat rekap ranking engagement:", error);
       let msg;
@@ -2980,9 +2971,11 @@ export const dirRequestHandlers = {
       ) {
         msg = error.message;
       } else {
+        // eslint-disable-next-line no-unused-vars
         msg = `❌ Gagal membuat rekap ranking engagement (${option.label}).`;
       }
-      await waClient.sendMessage(chatId, msg);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msg);
     } finally {
       if (filePath) {
         try {
@@ -3010,18 +3003,20 @@ export const dirRequestHandlers = {
     };
 
     if (!rawInput) {
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_METADATA_PROMPT(defaultClientId)
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_METADATA_PROMPT(defaultClientId)
+      // );
       return;
     }
 
     if (rawInput.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu Monitoring Satbinmas Official ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu Monitoring Satbinmas Official ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3037,37 +3032,42 @@ export const dirRequestHandlers = {
     const username = usernamePart.replace(/^@/, "").trim();
 
     if (!username) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ Username Instagram Satbinmas Official belum diisi."
-      );
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_METADATA_PROMPT(normalizedClientId)
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "❌ Username Instagram Satbinmas Official belum diisi."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_METADATA_PROMPT(normalizedClientId)
+      // );
       return;
     }
 
     const usernamePattern = /^[A-Za-z0-9._]{2,}$/u;
     if (!usernamePattern.test(username)) {
-      await waClient.sendMessage(
-        chatId,
-        "❌ Format username tidak valid. Gunakan huruf, angka, titik, atau underscore tanpa spasi."
-      );
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_METADATA_PROMPT(normalizedClientId)
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "❌ Format username tidak valid. Gunakan huruf, angka, titik, atau underscore tanpa spasi."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_METADATA_PROMPT(normalizedClientId)
+      // );
       return;
     }
 
     try {
       const profile = await fetchInstagramInfo(username);
       if (!profile) {
-        await waClient.sendMessage(
-          chatId,
-          `❌ Metadata tidak ditemukan untuk @${username}.`
-        );
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(
+          // chatId,
+          // `❌ Metadata tidak ditemukan untuk @${username}.`
+        // );
       } else {
         const profileName =
           profile.full_name || profile.fullName || profile.username || username;
@@ -3089,15 +3089,18 @@ export const dirRequestHandlers = {
         ];
         if (bio) lines.push(`Bio: ${bio}`);
 
-        await waClient.sendMessage(chatId, lines.join("\n"));
+        // WhatsApp functionality removed
+        // await waClient.sendMessage(chatId, lines.join("\n"));
       }
     } catch (error) {
       console.error("Gagal mengambil metadata IG Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const reason = error?.message?.slice(0, 400) || "Alasan tidak diketahui.";
-      await waClient.sendMessage(
-        chatId,
-        `❌ Gagal mengambil metadata akun Satbinmas Official: ${reason}`
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // `❌ Gagal mengambil metadata akun Satbinmas Official: ${reason}`
+      // );
     }
 
     session.step = "main";
@@ -3110,25 +3113,28 @@ export const dirRequestHandlers = {
     text,
     waClient
   ) {
+    // eslint-disable-next-line no-unused-vars
     const defaultClientId =
       session.dir_client_id || session.selectedClientId || DITBINMAS_CLIENT_ID;
     const rawInput = (text || "").trim();
 
     if (rawInput.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu sinkronisasi secUid TikTok Satbinmas Official ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu sinkronisasi secUid TikTok Satbinmas Official ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
     }
 
     try {
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_TIKTOK_SECUID_PROMPT(defaultClientId)
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_TIKTOK_SECUID_PROMPT(defaultClientId)
+      // );
 
       const summary = await syncSatbinmasOfficialTiktokSecUidForOrgClients();
 
@@ -3188,17 +3194,20 @@ export const dirRequestHandlers = {
         failedLines.forEach((msg) => lines.push(msg));
       }
 
-      await waClient.sendMessage(chatId, lines.join("\n"));
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, lines.join("\n"));
     } catch (error) {
       console.error(
         "Gagal sinkronisasi secUid TikTok Satbinmas Official:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const reason = error?.message?.slice(0, 400) || "Alasan tidak diketahui.";
-      await waClient.sendMessage(
-        chatId,
-        `❌ Gagal sinkron secUid TikTok Satbinmas Official: ${reason}`
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // `❌ Gagal sinkron secUid TikTok Satbinmas Official: ${reason}`
+      // );
     }
 
     session.step = "main";
@@ -3209,31 +3218,37 @@ export const dirRequestHandlers = {
     const rawInput = (text || "").trim();
 
     if (rawInput.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu pengambilan konten TikTok Satbinmas Official ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu pengambilan konten TikTok Satbinmas Official ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
     }
 
     try {
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_TIKTOK_MEDIA_PROMPT
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_TIKTOK_MEDIA_PROMPT
+      // );
 
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialTiktokRecap();
-      await waClient.sendMessage(chatId, recap);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil konten TikTok Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil konten TikTok Satbinmas Official.";
-      await waClient.sendMessage(
-        chatId,
-        `❌ ${message}`
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // `❌ ${message}`
+      // );
     }
 
     session.step = "main";
@@ -3244,31 +3259,37 @@ export const dirRequestHandlers = {
     const rawInput = (text || "").trim();
 
     if (rawInput.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu pengambilan konten Satbinmas Official ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu pengambilan konten Satbinmas Official ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
     }
 
     try {
-      await waClient.sendMessage(
-        chatId,
-        SATBINMAS_OFFICIAL_MEDIA_PROMPT
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // SATBINMAS_OFFICIAL_MEDIA_PROMPT
+      // );
 
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialInstagramRecap();
-      await waClient.sendMessage(chatId, recap);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil konten Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil konten Satbinmas Official.";
-      await waClient.sendMessage(
-        chatId,
-        `❌ ${message}`
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // `❌ ${message}`
+      // );
     }
 
     session.step = "main";
@@ -3283,7 +3304,8 @@ export const dirRequestHandlers = {
   ) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
       return;
     }
 
@@ -3294,10 +3316,11 @@ export const dirRequestHandlers = {
       normalizedInput === "back" ||
       input === "0"
     ) {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu rekap Instagram Satbinmas Official ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu rekap Instagram Satbinmas Official ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3305,22 +3328,28 @@ export const dirRequestHandlers = {
 
     const option = SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT);
       return;
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialInstagramDbRecap(option.period);
-      await waClient.sendMessage(chatId, recap);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil rekap Instagram Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil rekap Instagram Satbinmas Official.";
-      await waClient.sendMessage(chatId, `❌ ${message}`);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, `❌ ${message}`);
     }
 
     session.step = "main";
@@ -3330,7 +3359,8 @@ export const dirRequestHandlers = {
   async choose_satbinmas_official_tiktok_recap_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
       return;
     }
 
@@ -3341,7 +3371,8 @@ export const dirRequestHandlers = {
       normalizedInput === "back" ||
       input === "0"
     ) {
-      await waClient.sendMessage(chatId, "✅ Menu rekap TikTok Satbinmas Official ditutup.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "✅ Menu rekap TikTok Satbinmas Official ditutup.");
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3349,22 +3380,28 @@ export const dirRequestHandlers = {
 
     const option = SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT);
       return;
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialTiktokDbRecap(option.period);
-      await waClient.sendMessage(chatId, recap);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil rekap TikTok Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil rekap TikTok Satbinmas Official.";
-      await waClient.sendMessage(chatId, `❌ ${message}`);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, `❌ ${message}`);
     }
 
     session.step = "main";
@@ -3374,15 +3411,17 @@ export const dirRequestHandlers = {
   async choose_kasat_binmas_likes_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu Absensi Likes Kasat Binmas ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu Absensi Likes Kasat Binmas ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3390,24 +3429,29 @@ export const dirRequestHandlers = {
 
     const option = KASAT_BINMAS_LIKES_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_LIKES_MENU_TEXT);
       return;
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatBinmasLikesRecap({
         period: option.period,
       });
-      await waClient.sendMessage(chatId, narrative);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, narrative);
     } catch (error) {
       console.error(
         "Gagal membuat rekap Absensi Likes Kasat Binmas:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3415,7 +3459,8 @@ export const dirRequestHandlers = {
           error.message.includes("Tidak ada data"))
           ? error.message
           : `❌ Gagal membuat rekap Absensi Likes Kasat Binmas (${option.description}).`;
-      await waClient.sendMessage(chatId, msg);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msg);
     }
 
     session.step = "main";
@@ -3425,16 +3470,18 @@ export const dirRequestHandlers = {
   async choose_kasat_binmas_likes_excel_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await safeSendMessage(
-        waClient,
-        chatId,
-        "✅ Menu Rekap Likes Instagram Kasat Binmas (Excel) ditutup."
-      );
+      // WhatsApp functionality removed
+      // await safeSendMessage(
+        // waClient,
+        // chatId,
+        // "✅ Menu Rekap Likes Instagram Kasat Binmas (Excel) ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3442,12 +3489,14 @@ export const dirRequestHandlers = {
 
     const option = KASAT_BINMAS_LIKES_PERIOD_MAP[input];
     if (!option) {
-      await safeSendMessage(
-        waClient,
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await safeSendMessage(
+        // waClient,
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
       return;
     }
 
@@ -3471,7 +3520,8 @@ export const dirRequestHandlers = {
           result?.error
         );
         session.step = "choose_kasat_binmas_likes_excel_period";
-        await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
+        // WhatsApp functionality removed
+        // await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
         return;
       }
     } catch (error) {
@@ -3480,12 +3530,14 @@ export const dirRequestHandlers = {
         error
       );
       session.step = "choose_kasat_binmas_likes_excel_period";
-      await safeSendMessage(
-        waClient,
-        chatId,
-        "❌ Terjadi gangguan saat menyiapkan rekap Likes Kasat Binmas. Silakan coba lagi."
-      );
-      await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await safeSendMessage(
+        // waClient,
+        // chatId,
+        // "❌ Terjadi gangguan saat menyiapkan rekap Likes Kasat Binmas. Silakan coba lagi."
+      // );
+      // WhatsApp functionality removed
+      // await safeSendMessage(waClient, chatId, KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT);
       return;
     } finally {
       session.dirRequestReferenceDate = undefined;
@@ -3505,15 +3557,17 @@ export const dirRequestHandlers = {
   ) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu Rekap Komentar TikTok Kasat Binmas (Excel) ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu Rekap Komentar TikTok Kasat Binmas (Excel) ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3521,11 +3575,13 @@ export const dirRequestHandlers = {
 
     const option = KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT);
       return;
     }
 
@@ -3548,6 +3604,7 @@ export const dirRequestHandlers = {
         "Gagal membuat rekap komentar TikTok Kasat Binmas (Excel):",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3556,7 +3613,8 @@ export const dirRequestHandlers = {
           ? error.message
           : `❌ Gagal mengirim rekap komentar TikTok Kasat Binmas (Excel) (${option.description}).`;
       try {
-        await safeSendMessage(waClient, chatId, msg);
+        // WhatsApp functionality removed
+        // await safeSendMessage(waClient, chatId, msg);
       } catch (sendError) {
         console.error(
           "Gagal mengirim pesan error rekap komentar TikTok Kasat Binmas (Excel):",
@@ -3576,15 +3634,17 @@ export const dirRequestHandlers = {
   async choose_kasat_binmas_tiktok_comment_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await waClient.sendMessage(
-        chatId,
-        "✅ Menu Absensi Komentar TikTok Kasat Binmas ditutup."
-      );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "✅ Menu Absensi Komentar TikTok Kasat Binmas ditutup."
+      // );
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3592,11 +3652,13 @@ export const dirRequestHandlers = {
 
     const option = KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 3 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT);
       return;
     }
 
@@ -3608,16 +3670,19 @@ export const dirRequestHandlers = {
         : undefined;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatBinmasTiktokCommentRecap({
         period: option.period,
         referenceDate: normalizedReferenceDate,
       });
-      await waClient.sendMessage(chatId, narrative);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, narrative);
     } catch (error) {
       console.error(
         "Gagal membuat rekap Absensi Komentar TikTok Kasat Binmas:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3625,7 +3690,8 @@ export const dirRequestHandlers = {
           error.message.includes("Tidak ada data"))
           ? error.message
           : `❌ Gagal membuat rekap Absensi Komentar TikTok Kasat Binmas (${option.description}).`;
-      await waClient.sendMessage(chatId, msg);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msg);
     } finally {
       session.dirRequestReferenceDate = undefined;
       session.executionDate = undefined;
@@ -3639,12 +3705,14 @@ export const dirRequestHandlers = {
   async choose_kasatker_report_period(session, chatId, text, waClient) {
     const input = (text || "").trim();
     if (!input) {
-      await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
       return;
     }
 
     if (input.toLowerCase() === "batal") {
-      await waClient.sendMessage(chatId, "✅ Menu Laporan Kasatker ditutup.");
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, "✅ Menu Laporan Kasatker ditutup.");
       session.step = "main";
       await dirRequestHandlers.main(session, chatId, "", waClient);
       return;
@@ -3652,11 +3720,13 @@ export const dirRequestHandlers = {
 
     const option = KASATKER_REPORT_PERIOD_MAP[input];
     if (!option) {
-      await waClient.sendMessage(
-        chatId,
-        "Pilihan tidak valid. Balas angka 1 sampai 4 atau ketik *batal*."
-      );
-      await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(
+        // chatId,
+        // "Pilihan tidak valid. Balas angka 1 sampai 4 atau ketik *batal*."
+      // );
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, KASATKER_REPORT_MENU_TEXT);
       return;
     }
 
@@ -3665,12 +3735,14 @@ export const dirRequestHandlers = {
     const roleFlag = session.role;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatkerReport({
         clientId: targetClientId,
         roleFlag,
         period: option.period,
       });
-      await waClient.sendMessage(chatId, narrative);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, narrative);
     } catch (error) {
       console.error("Gagal membuat Laporan Kasatker:", error);
       let msg;
@@ -3682,9 +3754,11 @@ export const dirRequestHandlers = {
       ) {
         msg = error.message;
       } else {
+        // eslint-disable-next-line no-unused-vars
         msg = `❌ Gagal membuat Laporan Kasatker (${option.label}).`;
       }
-      await waClient.sendMessage(chatId, msg);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msg);
     }
 
     session.step = "main";
@@ -3697,13 +3771,16 @@ export const dirRequestHandlers = {
     const roleFlag = session.role;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatkerAttendanceSummary({
         clientId: targetClientId,
         roleFlag,
       });
-      await waClient.sendMessage(chatId, narrative);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, narrative);
     } catch (error) {
       console.error("Gagal membuat Absensi Kasatker:", error);
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3711,7 +3788,8 @@ export const dirRequestHandlers = {
           error.message.includes("Tidak ada data"))
           ? error.message
           : "❌ Gagal membuat Absensi Kasatker.";
-      await waClient.sendMessage(chatId, msg);
+      // WhatsApp functionality removed
+      // await waClient.sendMessage(chatId, msg);
     }
 
     session.step = "main";

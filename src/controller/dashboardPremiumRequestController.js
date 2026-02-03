@@ -3,37 +3,13 @@ import {
   createDashboardPremiumRequest,
   findDashboardPremiumRequestByToken,
   findLatestOpenDashboardPremiumRequestByIdentifier,
-  markDashboardPremiumRequestNotified,
 } from '../service/dashboardPremiumRequestService.js';
-import waClient from '../service/waService.js';
-import { sendDashboardPremiumRequestNotification } from '../service/waService.js';
 
 function getDashboardUserFromRequest(req) {
   return req.dashboardUser || req.user || null;
 }
 
-async function broadcastDashboardPremiumRequest(request, source = 'create') {
-  if (!request) return request;
-  if (source === 'confirm' && request.metadata?.admin_notification_sent) {
-    return request;
-  }
-
-  try {
-    const notified = await sendDashboardPremiumRequestNotification(waClient, request);
-    if (notified) {
-      const metadataPatch = {
-        admin_notification_sent: true,
-        admin_notification_sent_at: request.metadata?.admin_notification_sent_at || new Date().toISOString(),
-        admin_notification_source: source,
-      };
-      return markDashboardPremiumRequestNotified(request, metadataPatch);
-    }
-  } catch (err) {
-    console.warn(
-      `[DashboardPremiumRequest] Failed to notify admins on ${source}: ${err?.message || err}`,
-    );
-  }
-
+async function broadcastDashboardPremiumRequest(request) {
   return request;
 }
 

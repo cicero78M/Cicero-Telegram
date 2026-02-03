@@ -152,11 +152,6 @@ jest.unstable_mockModule('fs/promises', () => ({
   unlink: mockUnlink,
   stat: mockStat,
 }));
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  sendWAFile: mockSendWAFile,
-  safeSendMessage: mockSafeSendMessage,
-  sendWithClientFallback: jest.fn(),
-}));
 jest.unstable_mockModule('../src/handler/fetchpost/instaFetchPost.js', () => ({
   fetchAndStoreInstaContent: mockFetchAndStoreInstaContent,
 }));

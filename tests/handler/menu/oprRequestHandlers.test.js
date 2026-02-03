@@ -12,8 +12,7 @@ describe('oprRequestHandlers - Conditional Menu Display', () => {
     jest.resetModules();
     
     // Mock dependencies
-    jest.unstable_mockModule('../../../src/utils/waHelper.js', () => ({
-      isAdminWhatsApp: jest.fn(() => false),
+    jest.unstable_mockModule('../../../src/utils/phoneHelper.js', () => ({
       formatToWhatsAppId: jest.fn((id) => id)
     }));
     

@@ -12,15 +12,9 @@ const normalizeUserWhatsAppId = (value, minLength = minPhoneDigitLength) => {
   return `${normalized}@c.us`;
 };
 
-jest.unstable_mockModule('../src/service/waService.js', () => ({ default: {} }));
 jest.unstable_mockModule('../src/handler/menu/dirRequestHandlers.js', () => ({
   formatExecutiveSummary: mockExecSummary,
   formatRekapUserData: mockRekapUser,
-}));
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  safeSendMessage: mockSafeSend,
-  normalizeUserWhatsAppId,
-  minPhoneDigitLength,
 }));
 jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
   sendDebug: mockSendDebug,
