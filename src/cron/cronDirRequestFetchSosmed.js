@@ -161,6 +161,8 @@ function formatCountsDelta(countsBefore, countsAfter) {
   return parts.length > 0 ? parts.join(" | ") : null;
 }
 
+// WhatsApp functionality removed - unused function kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 function formatAdminLogMessage(entry) {
   if (!entry) return null;
   if (typeof entry === "string") return `[${LOG_TAG}] ${entry}`.trim();
@@ -481,6 +483,7 @@ export async function runCron(options = {}) {
             countsBefore,
           })
         );
+        // eslint-disable-next-line no-unused-vars
         const { text, igCount, tiktokCount, state } = await generateSosmedTaskMessage(
           clientId,
           {
@@ -508,6 +511,7 @@ export async function runCron(options = {}) {
 
         // WhatsApp functionality removed - recipient collection and message sending disabled
         // const recipients = getRecipientsForClient(client);
+        // eslint-disable-next-line no-unused-vars
         const hasNewCounts =
           igCount !== previousState.igCount || tiktokCount !== previousState.tiktokCount;
 
@@ -519,6 +523,7 @@ export async function runCron(options = {}) {
             state?.tiktokVideoIds ?? previousTiktokVideoIds ?? previousState.tiktokVideoIds,
         };
 
+        // eslint-disable-next-line no-unused-vars
         const hasLinkChanges =
           hasLinkDifference(previousState.igShortcodes, nextState.igShortcodes) ||
           hasLinkDifference(previousState.tiktokVideoIds, nextState.tiktokVideoIds);

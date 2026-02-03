@@ -28,6 +28,7 @@ function addRecipients(targetSet, candidates = []) {
 
 export async function buildClientRecipientSet(
   clientId,
+  // eslint-disable-next-line no-unused-vars
   { includeGroup = true, includeAdmins = true, includeSuper = true, includeOperator = true } = {}
 ) {
   const recipients = new Set();

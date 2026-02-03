@@ -29,7 +29,7 @@ import { getGreeting, sortDivisionKeys, formatNama } from "../../utils/utilsHelp
 // WhatsApp functionality removed
 // import { sendWAFile, safeSendMessage, sendWithClientFallback } from "../../utils/waHelper.js";
 import { writeFile, mkdir, readFile, unlink, stat } from "fs/promises";
-import { join, basename } from "path";
+import { join } from "path";
 import {
   saveLikesRecapExcel,
   saveLikesRecapPerContentExcel,
@@ -67,10 +67,7 @@ import { generateInstagramAllDataRecap } from "../../service/instagramAllDataRec
 import { generateTiktokAllDataRecap } from "../../service/tiktokAllDataRecapService.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
 
-const dirRequestGroup = "120363419830216549@g.us";
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
-
-const isGroupChatId = (value) => String(value || "").trim().endsWith("@g.us");
 
 // WhatsApp functionality removed - sendMenuMessage disabled
 // const sendMenuMessage = async (waClient, chatId, message, options = {}) => {
@@ -175,14 +172,8 @@ const DIGIT_EMOJI = {
   "9": "9️⃣",
 };
 
-const ENGAGEMENT_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih periode rekap ranking engagement jajaran:\n" +
-    Object.entries(ENGAGEMENT_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
+// WhatsApp functionality removed - menu text kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 const KASATKER_REPORT_MENU_TEXT = appendSubmenuBackInstruction(
   "Silakan pilih periode Laporan Kasatker:\n" +
     Object.entries(KASATKER_REPORT_PERIOD_MAP)
@@ -206,22 +197,6 @@ const KASAT_BINMAS_LIKES_PERIOD_MAP = {
   },
 };
 
-const KASAT_BINMAS_LIKES_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Absensi Likes Kasat Binmas:\n" +
-    Object.entries(KASAT_BINMAS_LIKES_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const KASAT_BINMAS_LIKES_EXCEL_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Likes Instagram Kasat Binmas (Excel):\n" +
-    Object.entries(KASAT_BINMAS_LIKES_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
 const KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP = {
   "1": {
     period: "daily",
@@ -237,22 +212,6 @@ const KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP = {
   },
 };
 
-const KASAT_BINMAS_TIKTOK_COMMENT_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Absensi Komentar TikTok Kasat Binmas:\n" +
-    Object.entries(KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const KASAT_BINMAS_TIKTOK_COMMENT_EXCEL_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Komentar TikTok Kasat Binmas (Excel):\n" +
-    Object.entries(KASAT_BINMAS_TIKTOK_COMMENT_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
 const SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP = {
   "1": {
     period: "daily",
@@ -267,49 +226,6 @@ const SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP = {
     description: "Rekap bulanan (1 s/d akhir bulan)",
   },
 };
-
-const SATBINMAS_OFFICIAL_INSTAGRAM_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap Instagram Satbinmas Official:\n" +
-    Object.entries(SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const SATBINMAS_OFFICIAL_TIKTOK_RECAP_MENU_TEXT = appendSubmenuBackInstruction(
-  "Silakan pilih rekap TikTok Satbinmas Official:\n" +
-    Object.entries(SATBINMAS_OFFICIAL_RECAP_PERIOD_MAP)
-      .map(([key, option]) => `${DIGIT_EMOJI[key] || key} ${option.description}`)
-      .join("\n") +
-    "\n\nBalas angka pilihan atau ketik *batal* untuk kembali."
-);
-
-const SATBINMAS_OFFICIAL_METADATA_PROMPT = (clientId) =>
-  "🔎 *Monitoring Satbinmas Official*\n" +
-  "Masukkan username Instagram Satbinmas Official yang ingin dicek. " +
-  "Secara default akan memakai Client ID aktif (" +
-  `${clientId || DITBINMAS_CLIENT_ID}).\n` +
-  "Format balasan: `username` atau `CLIENT_ID username`.\n" +
-  "Contoh: `satbinmas_official` atau `MKS01 satbinmas_official`.\n\n" +
-  "Balas *batal* untuk kembali ke menu.";
-
-const SATBINMAS_OFFICIAL_TIKTOK_SECUID_PROMPT = () =>
-  "🎯 *Sinkronisasi secUid TikTok Satbinmas Official*\n" +
-  "Bot akan mengambil seluruh username TikTok Satbinmas Official dari tabel `satbinmas_official_accounts` " +
-  "untuk semua client bertipe ORG, lalu menyinkronkan secUid lewat RapidAPI TikTok secara berurutan.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali ke menu.";
-
-const SATBINMAS_OFFICIAL_MEDIA_PROMPT =
-  "📸 *Ambil Konten Harian Satbinmas Official*\n" +
-  "Bot otomatis mengambil seluruh akun Instagram Satbinmas Official aktif " +
-  "untuk seluruh client bertipe ORG secara berurutan dengan jeda agar tetap mematuhi TOS RapidAPI.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali.";
-
-const SATBINMAS_OFFICIAL_TIKTOK_MEDIA_PROMPT =
-  "🎵 *Ambil Konten Harian TikTok Satbinmas Official*\n" +
-  "Bot otomatis mengambil seluruh akun TikTok Satbinmas Official aktif " +
-  "untuk semua client bertipe ORG secara berurutan dengan jeda aman agar tidak melanggar rate limit RapidAPI.\n" +
-  "Tidak perlu mengirim username atau Client ID tambahan. Balas *batal* untuk kembali.";
 
 const pangkatOrder = [
   "KOMISARIS BESAR POLISI",
@@ -1665,6 +1581,7 @@ async function performAction(
 ) {
   let msg = "";
   const { fallbackClients, fallbackContext } = fallbackOptions;
+  // eslint-disable-next-line no-unused-vars
   const fallbackPayload = fallbackClients
     ? { fallbackClients, fallbackContext, reportClient: waClient }
     : {};
@@ -1691,6 +1608,7 @@ async function performAction(
           roleFlag,
           username: context.username,
         });
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
         // WhatsApp functionality removed
         // await sendWAFile(
@@ -1902,6 +1820,7 @@ async function performAction(
         const recapData = await collectLikesRecap(clientId);
         if (recapData.shortcodes.length) {
           const excelPath = await saveLikesRecapExcel(recapData, clientId);
+          // eslint-disable-next-line no-unused-vars
           const bufferExcel = await readFile(excelPath);
           // WhatsApp functionality removed
           // await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1934,6 +1853,7 @@ async function performAction(
         const recapData = await collectKomentarRecap(clientId);
         if (recapData.videoIds.length) {
           const excelPath = await saveCommentRecapExcel(recapData, clientId);
+          // eslint-disable-next-line no-unused-vars
           const bufferExcel = await readFile(excelPath);
           // WhatsApp functionality removed
           // await sendWAFile(waClient, bufferExcel, basename(excelPath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1963,6 +1883,7 @@ async function performAction(
           }
           let buffer;
           try {
+            // eslint-disable-next-line no-unused-vars
             buffer = await readFile(filePath);
           } catch (error) {
             console.error("Gagal membaca file rekap likes Instagram (Excel):", error);
@@ -2008,6 +1929,7 @@ async function performAction(
           }
           try {
             filePath = await saveCommentRecapExcel(recapData, clientId);
+            // eslint-disable-next-line no-unused-vars
             const buffer = await readFile(filePath);
             // WhatsApp functionality removed
             // await sendWAFile(
@@ -2078,6 +2000,7 @@ async function performAction(
           } else if (igRecap?.shortcodes?.length) {
             const excelPath = await saveLikesRecapExcel(igRecap, clientId);
             tempFiles.push(excelPath);
+            // eslint-disable-next-line no-unused-vars
             const bufferExcel = await readFile(excelPath);
             // WhatsApp functionality removed
             // await sendWAFile(
@@ -2113,6 +2036,7 @@ async function performAction(
           if (ttRecap?.videoIds?.length) {
             const excelPath = await saveCommentRecapExcel(ttRecap, clientId);
             tempFiles.push(excelPath);
+            // eslint-disable-next-line no-unused-vars
             const bufferExcel = await readFile(excelPath);
             // WhatsApp functionality removed
             // await sendWAFile(
@@ -2160,6 +2084,7 @@ async function performAction(
             period,
           });
           filePath = generatedPath;
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(
@@ -2201,6 +2126,7 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -2227,6 +2153,7 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -2287,6 +2214,7 @@ async function performAction(
             msg = "Tidak ada data.";
             break;
           }
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(waClient, buffer, basename(filePath), chatId, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -2316,6 +2244,7 @@ async function performAction(
           break;
         }
         const filePath = await saveLikesRecapPerContentExcel(data, clientId);
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
         // WhatsApp functionality removed
         // await sendWAFile(
@@ -2336,6 +2265,7 @@ async function performAction(
           break;
         }
         const filePath = await saveCommentRecapPerContentExcel(recapData, clientId);
+        // eslint-disable-next-line no-unused-vars
         const buffer = await readFile(filePath);
         // WhatsApp functionality removed
         // await sendWAFile(
@@ -2473,6 +2403,7 @@ async function performAction(
             roleFlag,
             clientName: client?.nama || clientId,
           });
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(
@@ -2503,6 +2434,7 @@ async function performAction(
             roleFlag,
             clientName: client?.nama || clientId,
           });
+          // eslint-disable-next-line no-unused-vars
           const buffer = await readFile(filePath);
           // WhatsApp functionality removed
           // await sendWAFile(
@@ -2641,6 +2573,7 @@ export const dirRequestHandlers = {
     }
 
     const clientName = session.clientName;
+    // eslint-disable-next-line no-unused-vars
     const menu =
       `Client: *${clientName}*\n` +
       "┏━━━━━━━━━━━━ *MENU DIRREQUEST* ━━━━━━━━━━━━\n" +
@@ -2715,6 +2648,7 @@ export const dirRequestHandlers = {
       })
       .join("\n");
 
+    // eslint-disable-next-line no-unused-vars
     const prompt =
       "Pilih *Client ID* Direktorat aktif sebelum membuka menu dirrequest:\n" +
       (choiceList || "(Belum ada data client Direktorat aktif)") +
@@ -3011,6 +2945,7 @@ export const dirRequestHandlers = {
         period: option.period,
       });
       filePath = generatedPath;
+      // eslint-disable-next-line no-unused-vars
       const buffer = await readFile(filePath);
       // WhatsApp functionality removed
       // await sendWAFile(
@@ -3036,6 +2971,7 @@ export const dirRequestHandlers = {
       ) {
         msg = error.message;
       } else {
+        // eslint-disable-next-line no-unused-vars
         msg = `❌ Gagal membuat rekap ranking engagement (${option.label}).`;
       }
       // WhatsApp functionality removed
@@ -3158,6 +3094,7 @@ export const dirRequestHandlers = {
       }
     } catch (error) {
       console.error("Gagal mengambil metadata IG Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const reason = error?.message?.slice(0, 400) || "Alasan tidak diketahui.";
       // WhatsApp functionality removed
       // await waClient.sendMessage(
@@ -3176,6 +3113,7 @@ export const dirRequestHandlers = {
     text,
     waClient
   ) {
+    // eslint-disable-next-line no-unused-vars
     const defaultClientId =
       session.dir_client_id || session.selectedClientId || DITBINMAS_CLIENT_ID;
     const rawInput = (text || "").trim();
@@ -3263,6 +3201,7 @@ export const dirRequestHandlers = {
         "Gagal sinkronisasi secUid TikTok Satbinmas Official:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const reason = error?.message?.slice(0, 400) || "Alasan tidak diketahui.";
       // WhatsApp functionality removed
       // await waClient.sendMessage(
@@ -3296,11 +3235,13 @@ export const dirRequestHandlers = {
         // SATBINMAS_OFFICIAL_TIKTOK_MEDIA_PROMPT
       // );
 
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialTiktokRecap();
       // WhatsApp functionality removed
       // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil konten TikTok Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil konten TikTok Satbinmas Official.";
       // WhatsApp functionality removed
@@ -3335,11 +3276,13 @@ export const dirRequestHandlers = {
         // SATBINMAS_OFFICIAL_MEDIA_PROMPT
       // );
 
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialInstagramRecap();
       // WhatsApp functionality removed
       // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil konten Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil konten Satbinmas Official.";
       // WhatsApp functionality removed
@@ -3396,11 +3339,13 @@ export const dirRequestHandlers = {
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialInstagramDbRecap(option.period);
       // WhatsApp functionality removed
       // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil rekap Instagram Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil rekap Instagram Satbinmas Official.";
       // WhatsApp functionality removed
@@ -3446,11 +3391,13 @@ export const dirRequestHandlers = {
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const recap = await buildSatbinmasOfficialTiktokDbRecap(option.period);
       // WhatsApp functionality removed
       // await waClient.sendMessage(chatId, recap);
     } catch (error) {
       console.error("Gagal mengambil rekap TikTok Satbinmas Official:", error);
+      // eslint-disable-next-line no-unused-vars
       const message =
         error?.message?.slice(0, 400) || "Gagal mengambil rekap TikTok Satbinmas Official.";
       // WhatsApp functionality removed
@@ -3493,6 +3440,7 @@ export const dirRequestHandlers = {
     }
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatBinmasLikesRecap({
         period: option.period,
       });
@@ -3503,6 +3451,7 @@ export const dirRequestHandlers = {
         "Gagal membuat rekap Absensi Likes Kasat Binmas:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3655,6 +3604,7 @@ export const dirRequestHandlers = {
         "Gagal membuat rekap komentar TikTok Kasat Binmas (Excel):",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3720,6 +3670,7 @@ export const dirRequestHandlers = {
         : undefined;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatBinmasTiktokCommentRecap({
         period: option.period,
         referenceDate: normalizedReferenceDate,
@@ -3731,6 +3682,7 @@ export const dirRequestHandlers = {
         "Gagal membuat rekap Absensi Komentar TikTok Kasat Binmas:",
         error
       );
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||
@@ -3783,6 +3735,7 @@ export const dirRequestHandlers = {
     const roleFlag = session.role;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatkerReport({
         clientId: targetClientId,
         roleFlag,
@@ -3801,6 +3754,7 @@ export const dirRequestHandlers = {
       ) {
         msg = error.message;
       } else {
+        // eslint-disable-next-line no-unused-vars
         msg = `❌ Gagal membuat Laporan Kasatker (${option.label}).`;
       }
       // WhatsApp functionality removed
@@ -3817,6 +3771,7 @@ export const dirRequestHandlers = {
     const roleFlag = session.role;
 
     try {
+      // eslint-disable-next-line no-unused-vars
       const narrative = await generateKasatkerAttendanceSummary({
         clientId: targetClientId,
         roleFlag,
@@ -3825,6 +3780,7 @@ export const dirRequestHandlers = {
       // await waClient.sendMessage(chatId, narrative);
     } catch (error) {
       console.error("Gagal membuat Absensi Kasatker:", error);
+      // eslint-disable-next-line no-unused-vars
       const msg =
         error?.message &&
         (error.message.includes("direktorat") ||

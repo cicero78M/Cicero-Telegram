@@ -2,11 +2,8 @@ import * as linkReportModel from '../model/linkReportModel.js';
 import { sendSuccess } from '../utils/response.js';
 import {
   extractFirstUrl,
-  getGreeting,
-  formatNama,
 } from '../utils/utilsHelper.js';
 import { generateLinkReportExcelBuffer } from '../service/amplifyExportService.js';
-import { findUserById } from '../model/userModel.js';
 
 export async function getAllLinkReports(req, res, next) {
   try {

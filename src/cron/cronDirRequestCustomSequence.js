@@ -1,7 +1,8 @@
 import { sendDebug } from '../middleware/debugHandler.js';
-import { runDirRequestAction } from '../handler/menu/dirRequestHandlers.js';
-import { findClientById } from '../service/clientService.js';
-import { splitRecipientField } from '../repository/clientContactRepository.js';
+// WhatsApp functionality removed - unused imports
+// import { runDirRequestAction } from '../handler/menu/dirRequestHandlers.js';
+// import { findClientById } from '../service/clientService.js';
+// import { splitRecipientField } from '../repository/clientContactRepository.js';
 // WhatsApp functionality removed
 // import {
 //   sendWithClientFallback,
@@ -10,14 +11,16 @@ import { splitRecipientField } from '../repository/clientContactRepository.js';
 //   minPhoneDigitLength,
 // } from '../utils/waHelper.js';
 // import waClient, { waGatewayClient, waUserClient } from '../service/waService.js';
-import { delayAfterSend } from './dirRequestThrottle.js';
-import {
-  normalizeGroupId,
-  runCron as runDirRequestFetchSosmed,
-} from './cronDirRequestFetchSosmed.js';
+// WhatsApp functionality removed - unused imports
+// import { delayAfterSend } from './dirRequestThrottle.js';
+// import {
+//   normalizeGroupId,
+//   runCron as runDirRequestFetchSosmed,
+// } from './cronDirRequestFetchSosmed.js';
 
-const DITBINMAS_CLIENT_ID = 'DITBINMAS';
-const BIDHUMAS_CLIENT_ID = 'BIDHUMAS';
+// WhatsApp functionality removed - unused constants
+// const DITBINMAS_CLIENT_ID = 'DITBINMAS';
+// const BIDHUMAS_CLIENT_ID = 'BIDHUMAS';
 export const JOB_KEY = './src/cron/cronDirRequestCustomSequence.js';
 export const BIDHUMAS_2030_JOB_KEY = `${JOB_KEY}#bidhumas-20-30`;
 export const DITBINMAS_RECAP_AND_CUSTOM_JOB_KEY = `${JOB_KEY}#ditbinmas-recap-and-custom`;
@@ -36,6 +39,8 @@ export const DITBINMAS_RECAP_AND_CUSTOM_JOB_KEY = `${JOB_KEY}#ditbinmas-recap-an
 //   return [primary, ...waFallbackClients.filter((entry) => entry.label !== primaryLabel)];
 // }
 
+// WhatsApp functionality removed - unused function kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 function logFallbackEvent(message) {
   sendDebug({ tag: 'CRON DIRREQ CUSTOM', msg: message });
   console.warn(message);
@@ -81,6 +86,8 @@ function logFallbackEvent(message) {
 //   ...
 // }
 
+// WhatsApp functionality removed - unused function kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 function normalizeActionEntry(entry) {
   if (!entry) return null;
   if (typeof entry === 'string') {
@@ -108,6 +115,8 @@ function isLastDayOfMonth(date = new Date()) {
   return checkDate.getMonth() !== nextDay.getMonth();
 }
 
+// WhatsApp functionality removed - unused function kept for potential re-enable
+// eslint-disable-next-line no-unused-vars
 function buildDitbinmasRecapPlan(referenceDate = new Date()) {
   const recapPeriods = new Set(['daily']);
   const kasatkerPeriods = new Set(['today']);
