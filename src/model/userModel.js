@@ -461,6 +461,7 @@ export async function updateUserField(user_id, field, value) {
     "tiktok",
     "whatsapp",
     "email",
+    "telegram_chat_id",
     "exception",
     "status",
     "nama",
@@ -783,6 +784,193 @@ export async function clearUsersWithAdminWA(adminWAList) {
     [adminWAList]
   );
   return rows;
+}
+
+// ========== TELEGRAM LINKING FUNCTIONS ==========
+
+/**
+ * Find user by telegram_chat_id
+ */
+export async function findUserByTelegramChatId(telegramChatId) {
+  if (!telegramChatId) return null;
+  const { rows } = await query(
+    `SELECT u.*,
+      c.nama AS client_name,
+      bool_or(r.role_name='ditbinmas') AS ditbinmas,
+      bool_or(r.role_name='ditlantas') AS ditlantas,
+      bool_or(r.role_name='bidhumas') AS bidhumas,
+      bool_or(r.role_name='ditsamapta') AS ditsamapta,
+      bool_or(r.role_name='operator') AS operator
+     FROM "user" u
+     LEFT JOIN clients c ON c.client_id = u.client_id
+     LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+     LEFT JOIN roles r ON ur.role_id = r.role_id
+     WHERE u.telegram_chat_id = $1
+     GROUP BY u.user_id, c.nama`,
+    [String(telegramChatId)]
+  );
+  return rows[0];
+}
+
+/**
+ * Create a pending telegram link request
+ */
+export async function createPendingTelegramLink(userId, telegramChatId, telegramUsername, telegramFirstName, telegramLastName) {
+  const uid = normalizeUserId(userId);
+  
+  // Generate a unique 6-digit approval code
+  const approvalCode = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Link expires in 24 hours
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  
+  const { rows } = await query(
+    `INSERT INTO pending_telegram_links 
+      (user_id, telegram_chat_id, telegram_username, telegram_first_name, telegram_last_name, approval_code, expires_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (user_id, telegram_chat_id) 
+    DO UPDATE SET 
+      telegram_username = EXCLUDED.telegram_username,
+      telegram_first_name = EXCLUDED.telegram_first_name,
+      telegram_last_name = EXCLUDED.telegram_last_name,
+      approval_code = EXCLUDED.approval_code,
+      expires_at = EXCLUDED.expires_at,
+      status = 'pending',
+      created_at = NOW()
+    RETURNING *`,
+    [uid, String(telegramChatId), telegramUsername, telegramFirstName, telegramLastName, approvalCode, expiresAt]
+  );
+  return rows[0];
+}
+
+/**
+ * Get pending telegram link by approval code
+ */
+export async function getPendingTelegramLinkByCode(approvalCode) {
+  const { rows } = await query(
+    `SELECT ptl.*, u.nama, u.title, u.client_id
+     FROM pending_telegram_links ptl
+     JOIN "user" u ON ptl.user_id = u.user_id
+     WHERE ptl.approval_code = $1 
+       AND ptl.status = 'pending' 
+       AND ptl.expires_at > NOW()`,
+    [approvalCode]
+  );
+  return rows[0];
+}
+
+/**
+ * Get pending telegram link by user_id
+ */
+export async function getPendingTelegramLinkByUserId(userId) {
+  const uid = normalizeUserId(userId);
+  const { rows } = await query(
+    `SELECT * FROM pending_telegram_links 
+     WHERE user_id = $1 
+       AND status = 'pending' 
+       AND expires_at > NOW()
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [uid]
+  );
+  return rows[0];
+}
+
+/**
+ * Get pending telegram link by telegram_chat_id
+ */
+export async function getPendingTelegramLinkByTelegramChatId(telegramChatId) {
+  const { rows } = await query(
+    `SELECT ptl.*, u.nama, u.title, u.client_id
+     FROM pending_telegram_links ptl
+     JOIN "user" u ON ptl.user_id = u.user_id
+     WHERE ptl.telegram_chat_id = $1 
+       AND ptl.status = 'pending' 
+       AND ptl.expires_at > NOW()
+     ORDER BY ptl.created_at DESC
+     LIMIT 1`,
+    [String(telegramChatId)]
+  );
+  return rows[0];
+}
+
+/**
+ * Approve telegram link and update user record
+ */
+export async function approveTelegramLink(approvalCode) {
+  await query('BEGIN');
+  try {
+    // Get the pending link
+    const { rows: linkRows } = await query(
+      `UPDATE pending_telegram_links 
+       SET status = 'approved', approved_at = NOW()
+       WHERE approval_code = $1 
+         AND status = 'pending' 
+         AND expires_at > NOW()
+       RETURNING *`,
+      [approvalCode]
+    );
+    
+    if (!linkRows || linkRows.length === 0) {
+      throw new Error('Link request tidak ditemukan atau sudah kadaluarsa');
+    }
+    
+    const link = linkRows[0];
+    
+    // Update user with telegram_chat_id
+    await query(
+      `UPDATE "user" SET telegram_chat_id = $1, updated_at = NOW() WHERE user_id = $2`,
+      [link.telegram_chat_id, link.user_id]
+    );
+    
+    await query('COMMIT');
+    return link;
+  } catch (err) {
+    await query('ROLLBACK');
+    throw err;
+  }
+}
+
+/**
+ * Reject telegram link
+ */
+export async function rejectTelegramLink(approvalCode) {
+  const { rows } = await query(
+    `UPDATE pending_telegram_links 
+     SET status = 'rejected'
+     WHERE approval_code = $1 
+       AND status = 'pending' 
+       AND expires_at > NOW()
+     RETURNING *`,
+    [approvalCode]
+  );
+  return rows[0];
+}
+
+/**
+ * Clean up expired telegram link requests
+ */
+export async function cleanupExpiredTelegramLinks() {
+  const { rows } = await query(
+    `UPDATE pending_telegram_links 
+     SET status = 'expired'
+     WHERE status = 'pending' 
+       AND expires_at <= NOW()
+     RETURNING link_id`
+  );
+  return rows.length;
+}
+
+/**
+ * Unlink telegram from user
+ */
+export async function unlinkTelegramFromUser(userId) {
+  const uid = normalizeUserId(userId);
+  const { rows } = await query(
+    `UPDATE "user" SET telegram_chat_id = NULL, updated_at = NOW() WHERE user_id = $1 RETURNING *`,
+    [uid]
+  );
+  return rows[0];
 }
 
 // --- Alias for backward compatibility ---

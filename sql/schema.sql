@@ -48,6 +48,7 @@ CREATE TABLE "user" (
   whatsapp VARCHAR,
   email VARCHAR,
   desa VARCHAR,
+  telegram_chat_id VARCHAR UNIQUE,
   client_id VARCHAR REFERENCES clients(client_id),
   status BOOLEAN DEFAULT TRUE,
   exception BOOLEAN DEFAULT FALSE,
@@ -57,6 +58,8 @@ CREATE TABLE "user" (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_user_telegram_chat_id ON "user"(telegram_chat_id);
 
 CREATE TABLE roles (
   role_id SERIAL PRIMARY KEY,
@@ -68,6 +71,26 @@ CREATE TABLE user_roles (
   role_id INTEGER REFERENCES roles(role_id),
   PRIMARY KEY (user_id, role_id)
 );
+
+CREATE TABLE pending_telegram_links (
+  link_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id VARCHAR NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+  telegram_chat_id VARCHAR NOT NULL,
+  telegram_username VARCHAR,
+  telegram_first_name VARCHAR,
+  telegram_last_name VARCHAR,
+  status VARCHAR NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'expired')),
+  approval_code VARCHAR NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  approved_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(user_id, telegram_chat_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_telegram_links_user_id ON pending_telegram_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_pending_telegram_links_telegram_chat_id ON pending_telegram_links(telegram_chat_id);
+CREATE INDEX IF NOT EXISTS idx_pending_telegram_links_approval_code ON pending_telegram_links(approval_code);
+CREATE INDEX IF NOT EXISTS idx_pending_telegram_links_status ON pending_telegram_links(status);
 
 CREATE OR REPLACE FUNCTION set_user_updated_at()
 RETURNS TRIGGER AS $$
