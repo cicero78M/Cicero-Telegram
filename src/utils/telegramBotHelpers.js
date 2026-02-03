@@ -43,9 +43,12 @@ export function escapeMarkdown(text) {
     return text;
   }
   
-  // Escape Markdown special characters: * _ ` [
+  // Escape Markdown special characters
+  // IMPORTANT: Escape backslash first to prevent double-escaping
+  // Then escape other Markdown special characters: * _ ` [
   // Note: We only escape opening brackets [ to prevent link formatting issues
   return text
+    .replace(/\\/g, '\\\\')
     .replace(/\*/g, '\\*')
     .replace(/_/g, '\\_')
     .replace(/`/g, '\\`')

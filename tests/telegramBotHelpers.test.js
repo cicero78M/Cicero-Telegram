@@ -1,6 +1,16 @@
 import { escapeMarkdown } from '../src/utils/telegramBotHelpers.js';
 
 describe('escapeMarkdown', () => {
+  it('should escape backslashes first', () => {
+    expect(escapeMarkdown('\\')).toBe('\\\\');
+    expect(escapeMarkdown('C:\\Users\\Test')).toBe('C:\\\\Users\\\\Test');
+  });
+
+  it('should not double-escape already escaped characters', () => {
+    // If user input contains \*, it should become \\* (backslash escaped, then asterisk escaped)
+    expect(escapeMarkdown('\\*')).toBe('\\\\\\*');
+  });
+
   it('should escape asterisks', () => {
     expect(escapeMarkdown('Hello * World')).toBe('Hello \\* World');
     expect(escapeMarkdown('**Bold**')).toBe('\\*\\*Bold\\*\\*');
