@@ -204,6 +204,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     // Default to DITBINMAS client for now
     // In production, this should be determined based on user authentication
     const clientId = 'DITBINMAS';
+    const chatIdStr = chatId.toString();
     
     // Call the performAction function from dirRequestHandlers
     // For Telegram bot, we don't have a WhatsApp client, so we pass null
@@ -211,12 +212,12 @@ async function handleMenuSelection(chatId, menuNumber, from) {
       menuNumber,      // action
       clientId,        // clientId
       null,            // waClient (not used for Telegram)
-      chatId.toString(), // chatId
+      chatIdStr,       // chatId
       null,            // roleFlag
       null,            // userClientId
       {                // context
         username: from.username || from.first_name || 'telegram_user',
-        chatId: chatId.toString(),
+        chatId: chatIdStr,
       },
       {}               // fallbackOptions
     );
