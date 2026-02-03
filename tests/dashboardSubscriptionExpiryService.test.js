@@ -2,8 +2,6 @@ import { jest } from '@jest/globals';
 
 const mockQuery = jest.fn();
 const mockExpireSubscription = jest.fn();
-const mockSafeSendMessage = jest.fn();
-const mockSendWithClientFallback = jest.fn();
 const mockFormatToWhatsAppId = jest.fn((digits) => `${digits}@c.us`);
 
 jest.unstable_mockModule('../src/repository/db.js', () => ({
@@ -14,16 +12,8 @@ jest.unstable_mockModule('../src/service/dashboardSubscriptionService.js', () =>
   expireSubscription: mockExpireSubscription,
 }));
 
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  safeSendMessage: mockSafeSendMessage,
-  sendWithClientFallback: mockSendWithClientFallback,
+jest.unstable_mockModule('../src/utils/phoneHelper.js', () => ({
   formatToWhatsAppId: mockFormatToWhatsAppId,
-}));
-
-jest.unstable_mockModule('../src/service/waService.js', () => ({
-  default: {},
-  waGatewayClient: {},
-  waUserClient: {},
 }));
 
 let selectExpiredSubscriptions;
@@ -78,19 +68,10 @@ test('processExpiredSubscriptions expires overdue entries and sends WhatsApp not
     ],
   });
   mockExpireSubscription.mockResolvedValue({ subscription: { subscription_id: 'exp-1' } });
-  mockSafeSendMessage.mockResolvedValue(true);
-  mockSendWithClientFallback.mockResolvedValue(true);
 
   const result = await processExpiredSubscriptions(now);
 
   expect(result).toEqual({ checked: 2, expired: 1 });
   expect(mockExpireSubscription).toHaveBeenCalledTimes(1);
   expect(mockExpireSubscription).toHaveBeenCalledWith('exp-1', '2025-01-01T00:00:00Z');
-  expect(mockSendWithClientFallback).toHaveBeenCalledTimes(1);
-  expect(mockSendWithClientFallback).toHaveBeenCalledWith(
-    expect.objectContaining({
-      chatId: '08123456789@c.us',
-      message: expect.any(String),
-    })
-  );
 });

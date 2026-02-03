@@ -42,24 +42,8 @@ jest.unstable_mockModule('../src/utils/utilsHelper.js', () => ({
   formatComplaintIssue: mockFormatComplaintIssue,
 }));
 
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  getAdminWANumbers: jest.fn(),
-  getAdminWAIds: jest.fn(),
-  sendWAFile: jest.fn(),
+jest.unstable_mockModule('../src/utils/phoneHelper.js', () => ({
   formatToWhatsAppId: mockFormatToWhatsAppId,
-  safeSendMessage: mockSafeSendMessage,
-  sendWithClientFallback: jest.fn(),
-  isAdminWhatsApp: jest.fn(),
-  formatClientData: jest.fn(),
-  isUnsupportedVersionError: jest.fn(),
-  sendWAReport: jest.fn(),
-}));
-
-jest.unstable_mockModule('../src/service/waService.js', () => ({
-  default: {},
-  waGatewayClient: {},
-  waUserClient: {},
-  waitForWaReady: jest.fn(),
 }));
 
 jest.unstable_mockModule('../src/service/emailService.js', () => ({

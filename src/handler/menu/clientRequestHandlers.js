@@ -30,7 +30,6 @@ import os from "os";
 import { mdToPdf } from "md-to-pdf";
 import { query } from "../../db/index.js";
 import { saveContactIfNew } from "../../service/googleContactsService.js";
-import { formatToWhatsAppId } from "../../utils/phoneHelper.js";
 import { fetchInstagramInfo } from "../../service/instaRapidService.js";
 import { fetchTiktokProfile } from "../../service/tiktokRapidService.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";

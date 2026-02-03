@@ -17,17 +17,8 @@ jest.unstable_mockModule('../src/service/googleContactsService.js', () => ({
   saveGoogleContact: jest.fn(),
   searchByNumbers: jest.fn(),
 }));
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-  getAdminWANumbers: jest.fn(),
-  getAdminWAIds: jest.fn(),
-  sendWAFile: jest.fn(),
+jest.unstable_mockModule('../src/utils/phoneHelper.js', () => ({
   formatToWhatsAppId: jest.fn(),
-  safeSendMessage: mockSafeSendMessage,
-  sendWithClientFallback: jest.fn(),
-  isAdminWhatsApp: jest.fn(),
-  formatClientData: jest.fn(),
-  isUnsupportedVersionError: jest.fn(),
-  sendWAReport: jest.fn(),
 }));
 jest.unstable_mockModule('../src/model/linkReportModel.js', () => ({
   hasRecentLinkReport: jest.fn(),

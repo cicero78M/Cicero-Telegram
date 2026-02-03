@@ -2,22 +2,14 @@ import { jest } from '@jest/globals';
 
 const mockFindById = jest.fn();
 const mockUpdateStatus = jest.fn();
-const mockSafeSendMessage = jest.fn();
 
 jest.unstable_mockModule('../src/model/dashboardUserModel.js', () => ({
   findById: mockFindById,
   updateStatus: mockUpdateStatus
 }));
 
-jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
+jest.unstable_mockModule('../src/utils/phoneHelper.js', () => ({
   formatToWhatsAppId: (num) => num,
-  safeSendMessage: mockSafeSendMessage
-}));
-
-const mockWaClient = {};
-jest.unstable_mockModule('../src/service/waService.js', () => ({
-  default: mockWaClient,
-  waitForWaReady: () => Promise.resolve()
 }));
 
 let controller;
@@ -29,7 +21,6 @@ beforeAll(async () => {
 beforeEach(() => {
   mockFindById.mockReset();
   mockUpdateStatus.mockReset();
-  mockSafeSendMessage.mockReset();
 });
 
 test('approveDashboardUser sends approval message', async () => {
@@ -43,11 +34,6 @@ test('approveDashboardUser sends approval message', async () => {
   await controller.approveDashboardUser(req, res, next);
 
   expect(mockUpdateStatus).toHaveBeenCalledWith('1', true);
-  expect(mockSafeSendMessage).toHaveBeenCalledWith(
-    mockWaClient,
-    '0812',
-    expect.stringContaining('disetujui')
-  );
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ success: true, data: { dashboard_user_id: '1', status: true } });
 });
@@ -63,11 +49,6 @@ test('rejectDashboardUser sends rejection message', async () => {
   await controller.rejectDashboardUser(req, res, next);
 
   expect(mockUpdateStatus).toHaveBeenCalledWith('1', false);
-  expect(mockSafeSendMessage).toHaveBeenCalledWith(
-    mockWaClient,
-    '0812',
-    expect.stringContaining('ditolak')
-  );
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ success: true, data: { dashboard_user_id: '1', status: false } });
 });

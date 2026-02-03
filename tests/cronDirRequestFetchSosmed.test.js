@@ -34,15 +34,6 @@ jest.unstable_mockModule('../src/handler/fetchpost/tiktokFetchPost.js', () => ({
 jest.unstable_mockModule('../src/handler/fetchabsensi/sosmedTask.js', () => ({
   generateSosmedTaskMessage: mockGenerateMsg,
 }));
-jest.unstable_mockModule('../src/utils/waHelper.js', async () => {
-  const actual = await import('../src/utils/waHelper.js');
-  return {
-    ...actual,
-    safeSendMessage: mockSafeSend,
-    sendWithClientFallback: mockSendWithClientFallback,
-    getAdminWAIds: () => ['123@c.us'],
-  };
-});
 jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
   sendDebug: mockSendDebug,
 }));

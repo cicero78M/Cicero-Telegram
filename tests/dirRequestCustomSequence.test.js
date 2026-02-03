@@ -59,20 +59,6 @@ async function loadModules() {
     splitRecipientField,
   }));
 
-  jest.unstable_mockModule('../src/utils/waHelper.js', () => ({
-    safeSendMessage,
-    sendWithClientFallback,
-    getAdminWAIds: () => [],
-    normalizeUserWhatsAppId,
-    minPhoneDigitLength,
-  }));
-
-  jest.unstable_mockModule('../src/service/waService.js', () => ({
-    default: {},
-    waGatewayClient: {},
-    waUserClient: {},
-  }));
-
   jest.unstable_mockModule('../src/cron/cronDirRequestFetchSosmed.js', () => ({
     normalizeGroupId,
     runCron: runDirRequestFetchSosmed,
