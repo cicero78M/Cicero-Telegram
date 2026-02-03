@@ -1,5 +1,7 @@
 // src/handler/menu/oprRequestHandlers.js
-import { isAdminWhatsApp, formatToWhatsAppId } from "../../utils/waHelper.js";
+// WhatsApp functionality removed - isAdminWhatsApp no longer available
+// import { isAdminWhatsApp, formatToWhatsAppId } from "../../utils/waHelper.js";
+import { formatToWhatsAppId } from "../../utils/phoneHelper.js";
 import { saveContactIfNew } from "../../service/googleContactsService.js";
 import { hariIndo } from "../../utils/constants.js";
 import {

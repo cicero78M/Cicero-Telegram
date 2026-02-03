@@ -4,7 +4,8 @@ import XLSX from "xlsx";
 import { getRekapLikesByClient } from "../model/instaLikeModel.js";
 import { getUsersByClient } from "../model/userModel.js";
 import { formatNama } from "../utils/utilsHelper.js";
-import { sendWAFile, safeSendMessage } from "../utils/waHelper.js";
+// WhatsApp functionality removed
+// import { sendWAFile, safeSendMessage } from "../utils/waHelper.js";
 import { matchesKasatBinmasJabatan } from "./kasatkerAttendanceService.js";
 import {
   describeKasatBinmasLikesPeriod,
@@ -173,26 +174,28 @@ export async function sendKasatBinmasLikesRecapExcel({
     filePath = generatedPath;
     periodLabel = generatedLabel;
     if (!filePath) {
-      await safeSendMessage(
-        waClient,
-        chatId,
-        message || "Belum ada konten Instagram Kasat Binmas untuk periode yang dipilih."
-      );
+      // WhatsApp functionality removed
+      // await safeSendMessage(
+      //   waClient,
+      //   chatId,
+      //   message || "Belum ada konten Instagram Kasat Binmas untuk periode yang dipilih."
+      // );
       return { success: true, empty: true, periodLabel };
     }
     const buffer = await readFile(filePath);
-    await sendWAFile(
-      waClient,
-      buffer,
-      basename(filePath),
-      chatId,
-      EXCEL_MIME
-    );
-    await safeSendMessage(
-      waClient,
-      chatId,
-      `✅ File rekap likes Kasat Binmas (${periodLabel}) dikirim.`
-    );
+    // WhatsApp functionality removed
+    // await sendWAFile(
+    //   waClient,
+    //   buffer,
+    //   basename(filePath),
+    //   chatId,
+    //   EXCEL_MIME
+    // );
+    // await safeSendMessage(
+    //   waClient,
+    //   chatId,
+    //   `✅ File rekap likes Kasat Binmas (${periodLabel}) dikirim.`
+    // );
     return { success: true, periodLabel };
   } catch (error) {
     console.error(
@@ -206,14 +209,15 @@ export async function sendKasatBinmasLikesRecapExcel({
         error.message.includes("Tidak ada data"))
         ? error.message
         : "❌ Gagal mengirim rekap Likes Kasat Binmas (Excel). Silakan coba lagi.";
-    try {
-      await safeSendMessage(waClient, chatId, msg);
-    } catch (sendError) {
-      console.error(
-        "[submenu 44] Gagal mengirim pesan error rekap Likes Kasat Binmas (Excel):",
-        sendError
-      );
-    }
+    // WhatsApp functionality removed
+    // try {
+    //   await safeSendMessage(waClient, chatId, msg);
+    // } catch (sendError) {
+    //   console.error(
+    //     "[submenu 44] Gagal mengirim pesan error rekap Likes Kasat Binmas (Excel):",
+    //     sendError
+    //   );
+    // }
     return { success: false, error };
   } finally {
     if (filePath) {
