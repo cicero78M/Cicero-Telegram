@@ -41,6 +41,13 @@ export const env = cleanEnv(process.env, {
     default: 'https://www.googleapis.com/auth/contacts'
   }),
   DASHBOARD_PREMIUM_ALLOWED_TIERS: str({ default: 'tier1,tier2,premium_1' }),
+  TELEGRAM_DIREKTORAT_BOT_TOKEN: str({ default: '' }),
+  TELEGRAM_DIREKTORAT_BOT_ENABLED: bool({ default: false }),
+  TELEGRAM_OPERATOR_BOT_TOKEN: str({ default: '' }),
+  TELEGRAM_OPERATOR_BOT_ENABLED: bool({ default: false }),
+  TELEGRAM_USER_BOT_TOKEN: str({ default: '' }),
+  TELEGRAM_USER_BOT_ENABLED: bool({ default: false }),
+  // Legacy support - kept for backward compatibility
   TELEGRAM_BOT_TOKEN: str({ default: '' }),
   TELEGRAM_BOT_ENABLED: bool({ default: false })
 });

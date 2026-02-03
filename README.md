@@ -18,7 +18,11 @@ Role-aware deactivation flows (per-role removal across menus and REST) are cover
 - Editorial event planning, press-release drafting, and approval logging exposed under Penmas-protected routes.
 - Premium subscription management, link amplification (regular and khusus), and directorate-level recap exports.
 - Aggregated analytics APIs for dashboards, including combined operator, directorate, and complaint views.
-- Telegram bot integration for accessing dirRequest menus via private chat (see [docs/telegram_bot_setup.md](docs/telegram_bot_setup.md)).
+- **Three specialized Telegram bots** for role-based access:
+  - **Bot Direktorat**: Directorate-level reporting and analytics (dirRequest menu)
+  - **Bot Operator**: User, amplification, and engagement management (oprRequest menu)
+  - **Bot User**: Personal data management for end users (userRequest menu)
+  - See [docs/telegram_multi_bot_setup.md](docs/telegram_multi_bot_setup.md) for complete setup guide.
 
 ## Requirements
 - Node.js 20 or newer
