@@ -3811,6 +3811,7 @@ export {
   formatExecutiveSummary,
   formatRekapBelumLengkapDirektorat,
   formatRekapAllSosmed,
+  performAction,
 };
 
 export default dirRequestHandlers;

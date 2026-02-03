@@ -248,14 +248,19 @@ describe('Telegram Bot Service', () => {
         expect.stringContaining('Memproses menu 1')
       );
       
-      // Should call performAction
+      // Should call performAction with correct parameters
       expect(mockPerformAction).toHaveBeenCalledWith(
-        '1',
-        'DITBINMAS',
+        '1',              // action
+        'DITBINMAS',      // clientId
+        null,             // waClient (not used for Telegram)
+        '123',            // chatId
+        null,             // roleFlag
+        null,             // userClientId
         expect.objectContaining({
           username: 'testuser',
           chatId: '123'
-        })
+        }),
+        {}                // fallbackOptions
       );
       
       // Should send result
