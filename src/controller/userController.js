@@ -1,7 +1,7 @@
 import * as userModel from '../model/userModel.js';
 import { getUserDirectoryUsers, UserDirectoryError } from '../service/userDirectoryService.js';
 import { sendSuccess } from '../utils/response.js';
-import { normalizeWhatsappNumber } from '../utils/waHelper.js';
+import { normalizeWhatsappNumber } from '../utils/phoneHelper.js';
 
 export const getAllUsers = async (req, res, next) => {
   try {

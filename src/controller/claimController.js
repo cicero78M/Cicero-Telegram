@@ -8,7 +8,7 @@ import {
   isVerified,
   refreshVerification,
 } from '../service/otpService.js';
-import { normalizeWhatsappNumber, minPhoneDigitLength } from '../utils/waHelper.js';
+import { normalizeWhatsappNumber, minPhoneDigitLength } from '../utils/phoneHelper.js';
 import dns from 'dns/promises';
 import validator from 'validator';
 

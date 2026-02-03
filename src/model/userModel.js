@@ -3,7 +3,7 @@
 import { query } from '../repository/db.js';
 import { PRIORITY_USER_NAMES } from '../utils/constants.js';
 import { normalizeEmail, normalizeUserId } from '../utils/utilsHelper.js';
-import { minPhoneDigitLength, normalizeWhatsappNumber } from '../utils/waHelper.js';
+import { minPhoneDigitLength, normalizeWhatsappNumber } from '../utils/phoneHelper.js';
 
 const NAME_PRIORITY_DEFAULT = PRIORITY_USER_NAMES.length + 1;
 export const STATIC_DIVISIONS = [
