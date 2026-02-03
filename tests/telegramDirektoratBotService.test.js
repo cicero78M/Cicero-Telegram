@@ -226,6 +226,77 @@ describe('Telegram Direktorat Bot Service', () => {
       const lastCall = mockSendMessage.mock.calls[mockSendMessage.mock.calls.length - 1];
       expect(lastCall[0]).toBe(123);
     });
+
+    it('should handle /exit command and clear session', async () => {
+      const exitHandler = mockOnText.mock.calls.find(
+        call => call[0].toString().includes('exit') || call[0].toString().includes('close')
+      )?.[1];
+      
+      expect(exitHandler).toBeDefined();
+      
+      const msg = {
+        chat: { id: 123, type: 'private' },
+        from: { username: 'testuser' }
+      };
+      
+      // First, let's simulate that user has a session by calling /menu
+      const menuHandler = mockOnText.mock.calls.find(
+        call => call[0].toString().includes('menu')
+      )?.[1];
+      if (menuHandler) {
+        await menuHandler(msg);
+      }
+      
+      mockSendMessage.mockClear();
+      
+      // Now call exit handler
+      await exitHandler(msg);
+      
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        123,
+        expect.stringContaining('Sesi direktorat telah ditutup')
+      );
+    });
+
+    it('should handle /exit command when no session exists', async () => {
+      const exitHandler = mockOnText.mock.calls.find(
+        call => call[0].toString().includes('exit') || call[0].toString().includes('close')
+      )?.[1];
+      
+      expect(exitHandler).toBeDefined();
+      
+      const msg = {
+        chat: { id: 456, type: 'private' }, // Different chat ID, no session
+        from: { username: 'testuser2' }
+      };
+      
+      await exitHandler(msg);
+      
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        456,
+        expect.stringContaining('Tidak ada sesi aktif')
+      );
+    });
+
+    it('should reject /exit command in group chat', async () => {
+      const exitHandler = mockOnText.mock.calls.find(
+        call => call[0].toString().includes('exit') || call[0].toString().includes('close')
+      )?.[1];
+      
+      expect(exitHandler).toBeDefined();
+      
+      const msg = {
+        chat: { id: 123, type: 'group' },
+        from: { username: 'testuser' }
+      };
+      
+      await exitHandler(msg);
+      
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        123,
+        expect.stringContaining('Bot ini hanya bekerja di chat private')
+      );
+    });
   });
 
   describe('Message handler', () => {
