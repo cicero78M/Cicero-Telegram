@@ -75,6 +75,7 @@ function setupCommandHandlers() {
       'Bot ini dapat membantu Anda mengakses menu direktorat untuk pelaporan dan analisis data.\n\n' +
       'Gunakan perintah:\n' +
       '/menu - Tampilkan menu dirRequest yang tersedia\n' +
+      '/exit - Tutup sesi direktorat yang sedang berlangsung\n' +
       '/help - Tampilkan bantuan';
     
     await direktoratBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
@@ -97,11 +98,13 @@ function setupCommandHandlers() {
       '*Perintah yang tersedia:*\n' +
       '/start - Mulai menggunakan bot\n' +
       '/menu - Tampilkan menu dirRequest\n' +
+      '/exit atau /close - Tutup sesi direktorat yang sedang berlangsung\n' +
       '/help - Tampilkan pesan bantuan ini\n\n' +
       '*Cara penggunaan:*\n' +
       '1. Ketik /menu untuk melihat daftar menu\n' +
       '2. Pilih nomor menu yang ingin diakses\n' +
-      '3. Bot akan memproses permintaan Anda\n\n' +
+      '3. Bot akan memproses permintaan Anda\n' +
+      '4. Ketik /exit untuk menutup sesi dan memilih client lain\n\n' +
       'Bot ini hanya merespons di *chat private*.';
     
     await direktoratBot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
@@ -127,6 +130,34 @@ function setupCommandHandlers() {
     } else {
       // Show client selection first
       await showClientSelection(chatId);
+    }
+  });
+
+  // /exit or /close command to close the session
+  direktoratBot.onText(/\/(exit|close)/, async (msg) => {
+    const chatId = msg.chat.id;
+    const chatType = msg.chat.type;
+    
+    console.log(`[Telegram Direktorat Bot] /exit or /close command from chat ${chatId} (type: ${chatType})`);
+    
+    if (chatType !== 'private') {
+      await direktoratBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    // Clear the user session
+    const session = userSessions.get(chatId);
+    if (session) {
+      userSessions.delete(chatId);
+      await direktoratBot.sendMessage(
+        chatId,
+        '✅ Sesi direktorat telah ditutup.\n\nKetik /start untuk memulai lagi.'
+      );
+    } else {
+      await direktoratBot.sendMessage(
+        chatId,
+        'ℹ️ Tidak ada sesi aktif.\n\nKetik /start untuk memulai.'
+      );
     }
   });
 }

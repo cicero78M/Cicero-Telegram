@@ -1585,8 +1585,6 @@ async function performAction(
   const fallbackPayload = fallbackClients
     ? { fallbackClients, fallbackContext, reportClient: waClient }
     : {};
-  const userClient = userClientId ? await findClientById(userClientId) : null;
-  const userType = userClient?.client_type?.toLowerCase();
   const attendanceClientId = String(userClientId || clientId || "").toUpperCase();
   const normalizedRoleFlag = (roleFlag || attendanceClientId).toLowerCase();
   switch (action) {
@@ -1698,9 +1696,7 @@ async function performAction(
         : targetId;
       await fetchAndStoreTiktokContent(targetId, waClient, chatId);
       await handleFetchKomentarTiktokBatch(waClient, chatId, targetId);
-      const rekapTiktok = await absensiKomentarDitbinmasReport(
-        userType === "org" ? { clientFilter: userClientId } : {}
-      );
+      const rekapTiktok = await absensiKomentarDitbinmasReport(targetId);
       msg =
         rekapTiktok ||
         `Tidak ada konten TikTok untuk ${targetLabel} hari ini.`;
