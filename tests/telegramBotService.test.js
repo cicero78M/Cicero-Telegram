@@ -23,6 +23,12 @@ jest.unstable_mockModule('../src/handler/menu/dirRequestHandlers.js', () => ({
   performAction: mockPerformAction,
 }));
 
+// Mock clientService for finding DIREKTORAT clients
+const mockFindAllActiveDirektoratClients = jest.fn();
+jest.unstable_mockModule('../src/service/clientService.js', () => ({
+  findAllActiveDirektoratClients: mockFindAllActiveDirektoratClients,
+}));
+
 const {
   initializeTelegramBot,
   stopTelegramBot,
@@ -33,6 +39,8 @@ const {
 describe('Telegram Bot Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default mock for findAllActiveDirektoratClients - empty array will default to DITBINMAS
+    mockFindAllActiveDirektoratClients.mockResolvedValue([]);
   });
 
   afterEach(async () => {
@@ -199,7 +207,7 @@ describe('Telegram Bot Service', () => {
       );
     });
 
-    it('should handle /menu command', async () => {
+    it('should handle /menu command and show client selection or menu', async () => {
       const menuHandler = mockOnText.mock.calls.find(
         call => call[0].toString().includes('menu')
       )?.[1];
@@ -213,11 +221,10 @@ describe('Telegram Bot Service', () => {
       
       await menuHandler(msg);
       
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        123,
-        expect.stringContaining('Menu DirRequest'),
-        expect.any(Object)
-      );
+      // Should send a message (either client selection or menu)
+      expect(mockSendMessage).toHaveBeenCalled();
+      const lastCall = mockSendMessage.mock.calls[mockSendMessage.mock.calls.length - 1];
+      expect(lastCall[0]).toBe(123);
     });
   });
 
@@ -225,6 +232,21 @@ describe('Telegram Bot Service', () => {
     beforeEach(async () => {
       await initializeTelegramBot('test-token', true);
       mockPerformAction.mockResolvedValue('Test result from menu');
+      
+      // Simulate user already selected client through /menu command
+      // by calling the menu handler first to set up session
+      const menuHandler = mockOnText.mock.calls.find(
+        call => call[0].toString().includes('menu')
+      )?.[1];
+      if (menuHandler) {
+        await menuHandler({
+          chat: { id: 123, type: 'private' },
+          from: { username: 'testuser' }
+        });
+      }
+      // Clear the mocks after setup so we can check fresh calls
+      mockSendMessage.mockClear();
+      mockPerformAction.mockClear();
     });
 
     it('should process menu number in private chat', async () => {

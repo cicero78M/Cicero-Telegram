@@ -1,8 +1,13 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
+import { findAllActiveDirektoratClients } from '../service/clientService.js';
 
 let bot = null;
 let isInitialized = false;
+// Store user sessions for client selection
+const userSessions = new Map();
+// Default client ID when no DIREKTORAT clients are available
+const DEFAULT_CLIENT_ID = 'DITBINMAS';
 
 /**
  * Initialize the Telegram bot
@@ -113,7 +118,15 @@ function setupCommandHandlers() {
       return;
     }
     
-    await sendMainMenu(chatId);
+    // Check if user already has a selected client
+    const session = userSessions.get(chatId);
+    if (session && session.selectedClientId) {
+      // User already has a client selected, show menu directly
+      await sendMainMenu(chatId);
+    } else {
+      // Show client selection first
+      await showClientSelection(chatId);
+    }
   });
 }
 
@@ -140,6 +153,13 @@ function setupMessageHandlers() {
     }
     
     console.log(`[Telegram Bot] Message from chat ${chatId}: ${text}`);
+    
+    // Check if user is in client selection mode
+    const session = userSessions.get(chatId);
+    if (session && session.step === 'choose_client') {
+      await handleClientSelection(chatId, text, msg.from);
+      return;
+    }
     
     // Check if it's a menu number
     if (text && /^\d+$/.test(text.trim())) {
@@ -189,6 +209,115 @@ async function sendMainMenu(chatId) {
 }
 
 /**
+ * Show client selection menu to the user
+ * @param {number} chatId - Telegram chat ID
+ */
+async function showClientSelection(chatId) {
+  try {
+    const clients = await findAllActiveDirektoratClients();
+    
+    if (!clients || clients.length === 0) {
+      // No DIREKTORAT clients found, default to DITBINMAS
+      userSessions.set(chatId, { 
+        selectedClientId: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      await bot.sendMessage(chatId, `✅ Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.`);
+      return;
+    }
+    
+    // Create client selection menu
+    let clientMenu = '📋 *Pilih Client DIREKTORAT*\n\n';
+    clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
+    
+    // Emoji array supports up to 10 clients visually
+    // For more than 10 clients, falls back to numeric format
+    clients.forEach((client, index) => {
+      const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index] || `${index + 1}.`;
+      const nama = client.nama || client.client_id;
+      clientMenu += `${numberEmoji} ${client.client_id} - ${nama}\n`;
+    });
+    
+    clientMenu += '\nBalas dengan *angka* atau *Client ID* yang tertera.';
+    
+    // Store clients in session
+    userSessions.set(chatId, {
+      step: 'choose_client',
+      clients: clients
+    });
+    
+    await bot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Bot] Error showing client selection:', error);
+    // Fallback to default client on error
+    userSessions.set(chatId, { 
+      selectedClientId: DEFAULT_CLIENT_ID,
+      step: 'menu'
+    });
+    await bot.sendMessage(chatId, `⚠️ Tidak dapat memuat daftar client. Menggunakan ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.`);
+  }
+}
+
+/**
+ * Handle client selection from user
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} input - User input (number or client ID)
+ * @param {object} from - Telegram user info
+ */
+async function handleClientSelection(chatId, input, from) {
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.clients) {
+      await bot.sendMessage(chatId, '❌ Sesi tidak valid. Silakan ketik /menu untuk memulai lagi.');
+      return;
+    }
+    
+    const clients = session.clients;
+    const normalizedInput = input.trim().toUpperCase();
+    let selectedClient = null;
+    
+    // Try to match by number first
+    if (/^\d+$/.test(normalizedInput)) {
+      const index = parseInt(normalizedInput) - 1;
+      if (index >= 0 && index < clients.length) {
+        selectedClient = clients[index];
+      }
+    }
+    
+    // Try to match by client ID if not found by number
+    if (!selectedClient) {
+      selectedClient = clients.find(c => c.client_id?.toUpperCase() === normalizedInput);
+    }
+    
+    if (!selectedClient) {
+      await bot.sendMessage(chatId, '❌ Pilihan tidak valid. Silakan pilih sesuai daftar atau ketik /menu untuk memulai ulang.');
+      return;
+    }
+    
+    // Update session with selected client
+    userSessions.set(chatId, {
+      selectedClientId: selectedClient.client_id,
+      clientName: selectedClient.nama || selectedClient.client_id,
+      step: 'menu'
+    });
+    
+    const clientLabel = selectedClient.nama ? 
+      `${selectedClient.client_id} - ${selectedClient.nama}` : 
+      selectedClient.client_id;
+    
+    await bot.sendMessage(
+      chatId, 
+      `✅ Client *${clientLabel}* telah dipilih.\n\nSilakan pilih menu dengan mengetik nomor menu.\nKetik /menu untuk melihat daftar menu.`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    console.error('[Telegram Bot] Error handling client selection:', error);
+    await bot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+  }
+}
+
+
+/**
  * Handle menu selection from user
  * @param {number} chatId - Telegram chat ID
  * @param {string} menuNumber - Menu number selected
@@ -198,12 +327,25 @@ async function handleMenuSelection(chatId, menuNumber, from) {
   try {
     console.log(`[Telegram Bot] Processing menu ${menuNumber} for chat ${chatId}`);
     
-    // Send processing message
-    await bot.sendMessage(chatId, `⏳ Memproses menu ${menuNumber}...`);
+    // Get user session to retrieve selected client
+    const session = userSessions.get(chatId);
+    let clientId = DEFAULT_CLIENT_ID; // Default fallback
     
-    // Default to DITBINMAS client for now
-    // In production, this should be determined based on user authentication
-    const clientId = 'DITBINMAS';
+    // If user has a selected client in session, use it
+    if (session && session.selectedClientId) {
+      clientId = session.selectedClientId;
+    } else {
+      // No client selected yet, prompt user to select client first
+      await bot.sendMessage(
+        chatId, 
+        '⚠️ Silakan pilih client terlebih dahulu. Ketik /menu untuk memulai.'
+      );
+      return;
+    }
+    
+    // Send processing message
+    await bot.sendMessage(chatId, `⏳ Memproses menu ${menuNumber} untuk client ${clientId}...`);
+    
     const chatIdStr = chatId.toString();
     
     // Call the performAction function from dirRequestHandlers
