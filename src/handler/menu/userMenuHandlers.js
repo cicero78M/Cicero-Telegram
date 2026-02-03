@@ -8,23 +8,34 @@ import {
 import { saveContactIfNew } from "../../service/googleContactsService.js";
 import { formatToWhatsAppId, normalizeWhatsappNumber } from "../../utils/phoneHelper.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
+import { escapeMarkdown } from "../../utils/telegramBotHelpers.js";
 
 // --- Helper Format Pesan ---
 function formatUserReport(user) {
-  const polresName = user.client_name || user.client_id || "-";
+  const polresName = escapeMarkdown(user.client_name || user.client_id || "-");
+  const nama = escapeMarkdown(user.nama || "-");
+  const title = escapeMarkdown(user.title || "-");
+  const userId = escapeMarkdown(user.user_id || "-");
+  const divisi = escapeMarkdown(user.divisi || "-");
+  const jabatan = escapeMarkdown(user.jabatan || "-");
+  const desa = escapeMarkdown(user.desa || "-");
+  const insta = user.insta ? "@" + escapeMarkdown(user.insta.replace(/^@/, "")) : "-";
+  const tiktok = escapeMarkdown(user.tiktok || "-");
+  const status = (user.status === true || user.status === "true") ? "🟢 AKTIF" : "🔴 NONAKTIF";
+  
   return [
     "👤 *Identitas Anda*",
     "",
     `*Nama Polres*: ${polresName}`,
-    `*Nama*     : ${user.nama || "-"}`,
-    `*Pangkat*  : ${user.title || "-"}`,
-    `*NRP/NIP*  : ${user.user_id || "-"}`,
-    `*Satfung*  : ${user.divisi || "-"}`,
-    `*Jabatan*  : ${user.jabatan || "-"}`,
-    ...(user.ditbinmas ? [`*Desa Binaan* : ${user.desa || "-"}`] : []),
-    `*Instagram*: ${user.insta ? "@" + user.insta.replace(/^@/, "") : "-"}`,
-    `*TikTok*   : ${user.tiktok || "-"}`,
-    `*Status*   : ${(user.status === true || user.status === "true") ? "🟢 AKTIF" : "🔴 NONAKTIF"}`,
+    `*Nama*     : ${nama}`,
+    `*Pangkat*  : ${title}`,
+    `*NRP/NIP*  : ${userId}`,
+    `*Satfung*  : ${divisi}`,
+    `*Jabatan*  : ${jabatan}`,
+    ...(user.ditbinmas ? [`*Desa Binaan* : ${desa}`] : []),
+    `*Instagram*: ${insta}`,
+    `*TikTok*   : ${tiktok}`,
+    `*Status*   : ${status}`,
   ].join("\n").trim();
 }
 
@@ -217,7 +228,7 @@ export const userMenuHandlers = {
 
     await waClient.sendMessage(
       chatId,
-      `✏️ Ketik nilai baru untuk field *${allowedFields[idx].label}*${extra}.\n\nBalas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`,
+      `✏️ Ketik nilai baru untuk field *${escapeMarkdown(allowedFields[idx].label)}*${extra}.\n\nBalas dengan angka atau nama pada daftar, atau ketik *batal* untuk membatalkan:`,
       { parse_mode: 'Markdown' }
     );
   },
@@ -356,7 +367,7 @@ export const userMenuHandlers = {
     
     await waClient.sendMessage(
       chatId,
-      `✅ Data *${fieldLabel}* untuk NRP ${user_id} berhasil diupdate menjadi *${displayValue}*.\n\nKetik /menu untuk kembali ke menu utama.`,
+      `✅ Data *${escapeMarkdown(fieldLabel)}* untuk NRP ${escapeMarkdown(user_id)} berhasil diupdate menjadi *${escapeMarkdown(displayValue)}*.\n\nKetik /menu untuk kembali ke menu utama.`,
       { parse_mode: 'Markdown' }
     );
     delete session.availableTitles;

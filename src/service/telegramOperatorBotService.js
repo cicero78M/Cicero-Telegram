@@ -3,7 +3,7 @@ import oprRequestHandlers from '../handler/menu/oprRequestHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
 import * as clientModel from '../model/clientModel.js';
-import { createSendMessageWrapper } from '../utils/telegramBotHelpers.js';
+import { createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
 let operatorBot = null;
 let isInitialized = false;
@@ -68,8 +68,9 @@ async function showClientSelection(chatId, clients) {
   // For more than 10 clients, falls back to numeric format
   clients.forEach((client, index) => {
     const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index] || `${index + 1}.`;
-    const nama = client.nama || client.client_id;
-    clientMenu += `${numberEmoji} ${client.client_id} - ${nama}\n`;
+    const nama = escapeMarkdown(client.nama || client.client_id);
+    const clientId = escapeMarkdown(client.client_id);
+    clientMenu += `${numberEmoji} ${clientId} - ${nama}\n`;
   });
   
   clientMenu += '\nBalas dengan *angka* atau *Client ID* yang tertera, atau ketik *batal* untuk keluar.';
