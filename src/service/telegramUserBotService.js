@@ -73,14 +73,32 @@ function setupCommandHandlers() {
       return;
     }
     
-    const welcomeMessage = 
-      '🤖 *Selamat datang di Bot User Cicero!*\n\n' +
-      'Bot ini dapat membantu Anda mengakses menu user untuk mengelola data pribadi Anda.\n\n' +
-      'Gunakan perintah:\n' +
-      '/menu - Tampilkan menu user yang tersedia\n' +
-      '/help - Tampilkan bantuan';
+    // Check if user is already linked
+    const linkedUser = await userModel.findUserByTelegramChatId(chatId);
     
-    await userBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
+    if (linkedUser) {
+      const welcomeMessage = 
+        '🤖 *Selamat datang kembali di Bot User Cicero!*\n\n' +
+        `Halo, *${linkedUser.nama || 'User'}*!\n\n` +
+        'Akun Telegram Anda sudah ditautkan.\n\n' +
+        '*Perintah yang tersedia:*\n' +
+        '/menu - Tampilkan menu user\n' +
+        '/help - Tampilkan bantuan';
+      
+      await userBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
+    } else {
+      const welcomeMessage = 
+        '🤖 *Selamat datang di Bot User Cicero!*\n\n' +
+        'Bot ini dapat membantu Anda mengakses dan mengelola data pribadi Anda.\n\n' +
+        '*Untuk memulai, tautkan akun Telegram Anda:*\n' +
+        '`/link NRP_ANDA`\n\n' +
+        'Contoh: `/link 081235114745`\n\n' +
+        '*Perintah lainnya:*\n' +
+        '/help - Tampilkan bantuan lengkap\n\n' +
+        '_Pastikan Anda menggunakan NRP/NIP yang terdaftar di sistem._';
+      
+      await userBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
+    }
   });
 
   // /help command
@@ -95,17 +113,39 @@ function setupCommandHandlers() {
       return;
     }
     
-    const helpMessage = 
-      '📖 *Bantuan Bot User Cicero*\n\n' +
-      '*Perintah yang tersedia:*\n' +
-      '/start - Mulai menggunakan bot\n' +
-      '/menu - Tampilkan menu user\n' +
-      '/help - Tampilkan pesan bantuan ini\n\n' +
-      '*Cara penggunaan:*\n' +
-      '1. Ketik /menu untuk melihat daftar menu user\n' +
-      '2. Pilih nomor menu yang ingin diakses\n' +
-      '3. Ikuti instruksi dari bot\n\n' +
-      'Bot ini hanya merespons di *chat private*.';
+    const linkedUser = await userModel.findUserByTelegramChatId(chatId);
+    
+    let helpMessage;
+    if (linkedUser) {
+      helpMessage = 
+        '📖 *Bantuan Bot User Cicero*\n\n' +
+        '*Perintah yang tersedia:*\n' +
+        '/start - Tampilkan pesan selamat datang\n' +
+        '/menu - Tampilkan menu user untuk mengelola data\n' +
+        '/help - Tampilkan pesan bantuan ini\n\n' +
+        '*Cara penggunaan:*\n' +
+        '1. Gunakan /menu untuk melihat menu yang tersedia\n' +
+        '2. Pilih menu yang ingin diakses\n' +
+        '3. Ikuti instruksi dari bot\n\n' +
+        'Bot ini hanya merespons di *chat private*.';
+    } else {
+      helpMessage = 
+        '📖 *Bantuan Bot User Cicero*\n\n' +
+        '*Langkah-langkah penggunaan:*\n\n' +
+        '*1. Tautkan Akun*\n' +
+        '   Gunakan: `/link NRP_ANDA`\n' +
+        '   Contoh: `/link 081235114745`\n\n' +
+        '*2. Setujui Penautan*\n' +
+        '   Setelah /link, Anda akan menerima kode persetujuan.\n' +
+        '   Ketik: `/approve KODE_ANDA`\n\n' +
+        '*3. Akses Menu*\n' +
+        '   Setelah berhasil ditautkan, gunakan:\n' +
+        '   `/menu` - untuk mengakses menu user\n\n' +
+        '*Perintah lainnya:*\n' +
+        '/start - Tampilkan pesan selamat datang\n' +
+        '/help - Tampilkan bantuan ini\n\n' +
+        'Bot ini hanya merespons di *chat private*.';
+    }
     
     await userBot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
   });
@@ -119,6 +159,20 @@ function setupCommandHandlers() {
     
     if (chatType !== 'private') {
       await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    // Check if user is linked
+    const linkedUser = await userModel.findUserByTelegramChatId(chatId);
+    if (!linkedUser) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ Akun Telegram Anda belum ditautkan dengan akun pengguna.\n\n' +
+        'Untuk menggunakan bot ini, silakan tautkan akun Anda dengan perintah:\n' +
+        '`/link NRP_ANDA`\n\n' +
+        'Contoh: `/link 081235114745`',
+        { parse_mode: 'Markdown' }
+      );
       return;
     }
     
@@ -150,6 +204,196 @@ function setupCommandHandlers() {
       await userBot.sendMessage(
         chatId, 
         '❌ Terjadi kesalahan saat menampilkan menu. Silakan coba lagi nanti.'
+      );
+    }
+  });
+
+  // /link command
+  userBot.onText(/\/link(?:\s+(.+))?/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const chatType = msg.chat.type;
+    const userId = match[1]?.trim();
+    
+    console.log(`[Telegram User Bot] /link command from chat ${chatId} with userId: ${userId}`);
+    
+    if (chatType !== 'private') {
+      await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    // Check if user is already linked
+    const existingLink = await userModel.findUserByTelegramChatId(chatId);
+    if (existingLink) {
+      await userBot.sendMessage(
+        chatId,
+        `✅ Akun Telegram Anda sudah ditautkan dengan:\n\n` +
+        `*Nama*: ${existingLink.nama || '-'}\n` +
+        `*NRP/NIP*: ${existingLink.user_id}\n` +
+        `*Satfung*: ${existingLink.divisi || '-'}\n\n` +
+        `Gunakan /menu untuk mengakses menu user.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    if (!userId) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ *Cara menggunakan perintah /link:*\n\n' +
+        'Ketik: `/link NRP_ANDA`\n\n' +
+        'Contoh: `/link 081235114745`\n\n' +
+        '_NRP/NIP adalah nomor identitas Anda yang terdaftar di sistem._',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    try {
+      // Find user by user_id
+      const user = await userModel.findUserById(userId);
+      
+      if (!user) {
+        await userBot.sendMessage(
+          chatId,
+          '❌ NRP/NIP tidak ditemukan dalam sistem.\n\n' +
+          'Pastikan Anda memasukkan NRP/NIP yang benar.\n' +
+          'Hubungi administrator jika Anda yakin NRP/NIP Anda sudah terdaftar.'
+        );
+        return;
+      }
+      
+      // Check if this user_id is already linked to another telegram account
+      if (user.telegram_chat_id && user.telegram_chat_id !== String(chatId)) {
+        await userBot.sendMessage(
+          chatId,
+          '❌ NRP/NIP ini sudah ditautkan dengan akun Telegram lain.\n\n' +
+          'Jika Anda yakin ini adalah akun Anda, silakan hubungi administrator untuk bantuan.'
+        );
+        return;
+      }
+      
+      // Check for pending link request for this telegram chat
+      const existingPending = await userModel.getPendingTelegramLinkByTelegramChatId(chatId);
+      if (existingPending) {
+        await userBot.sendMessage(
+          chatId,
+          '⏳ Anda sudah memiliki permintaan penautan yang menunggu persetujuan.\n\n' +
+          `*Kode Persetujuan*: \`${existingPending.approval_code}\`\n\n` +
+          'Silakan konfirmasi kode ini dengan mengetik:\n' +
+          '`/approve KODE_ANDA`\n\n' +
+          `Contoh: \`/approve ${existingPending.approval_code}\`\n\n` +
+          '_Kode akan kedaluwarsa dalam 24 jam._',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      
+      // Create pending link request
+      const telegramUser = msg.from;
+      const pendingLink = await userModel.createPendingTelegramLink(
+        userId,
+        chatId,
+        telegramUser.username || null,
+        telegramUser.first_name || null,
+        telegramUser.last_name || null
+      );
+      
+      await userBot.sendMessage(
+        chatId,
+        '✅ *Permintaan Penautan Berhasil Dibuat*\n\n' +
+        `Akun Telegram Anda akan ditautkan dengan:\n` +
+        `*Nama*: ${user.nama || '-'}\n` +
+        `*NRP/NIP*: ${user.user_id}\n` +
+        `*Satfung*: ${user.divisi || '-'}\n\n` +
+        `*Kode Persetujuan*: \`${pendingLink.approval_code}\`\n\n` +
+        'Untuk menyelesaikan penautan, ketik:\n' +
+        '`/approve KODE_ANDA`\n\n' +
+        `Contoh: \`/approve ${pendingLink.approval_code}\`\n\n` +
+        '_Kode akan kedaluwarsa dalam 24 jam._',
+        { parse_mode: 'Markdown' }
+      );
+      
+      console.log(`[Telegram User Bot] Link request created for user ${userId}, code: ${pendingLink.approval_code}`);
+      
+    } catch (error) {
+      console.error('[Telegram User Bot] Error in /link command:', error);
+      await userBot.sendMessage(
+        chatId,
+        '❌ Terjadi kesalahan saat memproses permintaan penautan. Silakan coba lagi nanti.'
+      );
+    }
+  });
+
+  // /approve command
+  userBot.onText(/\/approve(?:\s+(.+))?/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const chatType = msg.chat.type;
+    const approvalCode = match[1]?.trim();
+    
+    console.log(`[Telegram User Bot] /approve command from chat ${chatId} with code: ${approvalCode}`);
+    
+    if (chatType !== 'private') {
+      await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    if (!approvalCode) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ *Cara menggunakan perintah /approve:*\n\n' +
+        'Ketik: `/approve KODE_ANDA`\n\n' +
+        'Contoh: `/approve 123456`\n\n' +
+        '_Kode persetujuan dikirimkan setelah Anda menjalankan perintah /link._',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    try {
+      // Get pending link by code
+      const pendingLink = await userModel.getPendingTelegramLinkByCode(approvalCode);
+      
+      if (!pendingLink) {
+        await userBot.sendMessage(
+          chatId,
+          '❌ Kode persetujuan tidak valid atau sudah kedaluwarsa.\n\n' +
+          'Silakan lakukan permintaan penautan ulang dengan perintah `/link NRP_ANDA`.',
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      
+      // Verify that the approval is from the correct telegram user
+      if (pendingLink.telegram_chat_id !== String(chatId)) {
+        await userBot.sendMessage(
+          chatId,
+          '❌ Kode persetujuan ini tidak cocok dengan akun Telegram Anda.\n\n' +
+          'Pastikan Anda menggunakan akun Telegram yang sama dengan yang digunakan saat membuat permintaan penautan.'
+        );
+        return;
+      }
+      
+      // Approve the link
+      const approvedLink = await userModel.approveTelegramLink(approvalCode);
+      
+      await userBot.sendMessage(
+        chatId,
+        '✅ *Penautan Berhasil!*\n\n' +
+        `Akun Telegram Anda telah berhasil ditautkan dengan:\n` +
+        `*Nama*: ${pendingLink.nama || '-'}\n` +
+        `*NRP/NIP*: ${pendingLink.user_id}\n\n` +
+        'Sekarang Anda dapat mengakses menu user dengan perintah:\n' +
+        '`/menu`',
+        { parse_mode: 'Markdown' }
+      );
+      
+      console.log(`[Telegram User Bot] Link approved for user ${approvedLink.user_id}`);
+      
+    } catch (error) {
+      console.error('[Telegram User Bot] Error in /approve command:', error);
+      await userBot.sendMessage(
+        chatId,
+        '❌ Terjadi kesalahan saat memproses persetujuan. Silakan coba lagi nanti.'
       );
     }
   });
