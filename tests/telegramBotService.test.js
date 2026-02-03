@@ -322,6 +322,45 @@ describe('Telegram Bot Service', () => {
       expect(resultCalls.length).toBeGreaterThan(1);
     });
 
+    it('should handle long messages with UTF-8 characters correctly', async () => {
+      // Create a long message with emojis and multi-byte characters
+      const emojiLine = '🎉 Test message dengan emoji 🚀 dan karakter unicode 中文\n';
+      const longResult = emojiLine.repeat(200); // ~10000 characters
+      mockPerformAction.mockResolvedValue(longResult);
+      
+      const messageHandler = mockOn.mock.calls.find(
+        call => call[0] === 'message'
+      )?.[1];
+      
+      const msg = {
+        chat: { id: 123, type: 'private' },
+        text: '1',
+        from: { username: 'testuser' }
+      };
+      
+      await messageHandler(msg);
+      
+      // Should split into multiple messages
+      const resultCalls = mockSendMessage.mock.calls.filter(
+        call => call[1].length > 100
+      );
+      expect(resultCalls.length).toBeGreaterThan(1);
+      
+      // Verify no message exceeds the limit
+      resultCalls.forEach(call => {
+        expect(call[1].length).toBeLessThanOrEqual(4000);
+      });
+      
+      // Verify messages contain valid UTF-8 (no broken emoji)
+      resultCalls.forEach(call => {
+        const text = call[1];
+        // Check that emojis are present and not corrupted
+        // If string has emoji at start/end, it should be complete
+        expect(text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/); // No orphaned high surrogates
+        expect(text).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/); // No orphaned low surrogates
+      });
+    });
+
     it('should handle errors gracefully', async () => {
       mockPerformAction.mockRejectedValue(new Error('Test error'));
       

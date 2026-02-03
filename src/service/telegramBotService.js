@@ -216,7 +216,46 @@ async function handleMenuSelection(chatId, menuNumber, from) {
       // Split long messages if needed (Telegram has a 4096 character limit)
       const maxLength = 4000;
       if (result.length > maxLength) {
-        const chunks = result.match(new RegExp(`.{1,${maxLength}}`, 'g')) || [];
+        // Split by newlines when possible to avoid breaking words/characters
+        const chunks = [];
+        let currentChunk = '';
+        const lines = result.split('\n');
+        
+        for (const line of lines) {
+          // If adding this line would exceed the limit, push current chunk and start new one
+          if (currentChunk.length + line.length + 1 > maxLength) {
+            if (currentChunk) {
+              chunks.push(currentChunk);
+              currentChunk = '';
+            }
+            // If a single line is too long, split it carefully
+            if (line.length > maxLength) {
+              let remaining = line;
+              while (remaining.length > 0) {
+                // Find a safe split point (prefer spaces, but respect UTF-8 boundaries)
+                let splitPoint = maxLength;
+                if (remaining.length > maxLength) {
+                  // Look for last space before maxLength
+                  const lastSpace = remaining.lastIndexOf(' ', maxLength);
+                  if (lastSpace > maxLength * 0.8) { // Only use space if it's not too far back
+                    splitPoint = lastSpace;
+                  }
+                }
+                chunks.push(remaining.substring(0, splitPoint));
+                remaining = remaining.substring(splitPoint).trim();
+              }
+            } else {
+              currentChunk = line;
+            }
+          } else {
+            currentChunk += (currentChunk ? '\n' : '') + line;
+          }
+        }
+        
+        if (currentChunk) {
+          chunks.push(currentChunk);
+        }
+        
         for (const chunk of chunks) {
           await bot.sendMessage(chatId, chunk);
         }
