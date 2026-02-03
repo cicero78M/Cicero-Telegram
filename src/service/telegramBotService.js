@@ -6,6 +6,8 @@ let bot = null;
 let isInitialized = false;
 // Store user sessions for client selection
 const userSessions = new Map();
+// Default client ID when no DIREKTORAT clients are available
+const DEFAULT_CLIENT_ID = 'DITBINMAS';
 
 /**
  * Initialize the Telegram bot
@@ -217,10 +219,10 @@ async function showClientSelection(chatId) {
     if (!clients || clients.length === 0) {
       // No DIREKTORAT clients found, default to DITBINMAS
       userSessions.set(chatId, { 
-        selectedClientId: 'DITBINMAS',
+        selectedClientId: DEFAULT_CLIENT_ID,
         step: 'menu'
       });
-      await bot.sendMessage(chatId, '✅ Menggunakan client DITBINMAS sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.');
+      await bot.sendMessage(chatId, `✅ Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.`);
       return;
     }
     
@@ -228,6 +230,8 @@ async function showClientSelection(chatId) {
     let clientMenu = '📋 *Pilih Client DIREKTORAT*\n\n';
     clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
     
+    // Emoji array supports up to 10 clients visually
+    // For more than 10 clients, falls back to numeric format
     clients.forEach((client, index) => {
       const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index] || `${index + 1}.`;
       const nama = client.nama || client.client_id;
@@ -245,12 +249,12 @@ async function showClientSelection(chatId) {
     await bot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('[Telegram Bot] Error showing client selection:', error);
-    // Fallback to DITBINMAS on error
+    // Fallback to default client on error
     userSessions.set(chatId, { 
-      selectedClientId: 'DITBINMAS',
+      selectedClientId: DEFAULT_CLIENT_ID,
       step: 'menu'
     });
-    await bot.sendMessage(chatId, '⚠️ Tidak dapat memuat daftar client. Menggunakan DITBINMAS sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.');
+    await bot.sendMessage(chatId, `⚠️ Tidak dapat memuat daftar client. Menggunakan ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu.`);
   }
 }
 
@@ -282,7 +286,7 @@ async function handleClientSelection(chatId, input, from) {
     
     // Try to match by client ID if not found by number
     if (!selectedClient) {
-      selectedClient = clients.find(c => c.client_id.toUpperCase() === normalizedInput);
+      selectedClient = clients.find(c => c.client_id?.toUpperCase() === normalizedInput);
     }
     
     if (!selectedClient) {
@@ -325,7 +329,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     
     // Get user session to retrieve selected client
     const session = userSessions.get(chatId);
-    let clientId = 'DITBINMAS'; // Default fallback
+    let clientId = DEFAULT_CLIENT_ID; // Default fallback
     
     // If user has a selected client in session, use it
     if (session && session.selectedClientId) {

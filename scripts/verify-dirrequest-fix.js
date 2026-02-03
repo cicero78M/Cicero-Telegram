@@ -5,20 +5,6 @@
  * which is required for Telegram bot integration
  */
 
-// Mock minimal required modules
-const mockClientService = {
-  findClientById: async (id) => ({ client_id: id, nama: id, client_type: 'direktorat' }),
-  findAllActiveDirektoratClients: async () => [
-    { client_id: 'DITBINMAS', nama: 'Direktorat Bimbingan Masyarakat' },
-    { client_id: 'BIDHUMAS', nama: 'Bidang Humas' }
-  ]
-};
-
-const mockUserModel = {
-  getUsersSocialByClient: async () => [],
-  getClientsByRole: async () => ['DITBINMAS']
-};
-
 // Simple test
 async function testPerformAction() {
   console.log('Testing performAction return value...\n');
