@@ -126,6 +126,137 @@ describe('Telegram Client Bot Service - Error Handling', () => {
       }
     });
 
+    it('should handle null clients response by defaulting to DITBINMAS', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock null response
+      mockFindAllActiveClients.mockResolvedValue(null);
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 22345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Should send warning with default client
+        const calls = mockSendMessage.mock.calls.filter(call => call[0] === 22345);
+        expect(calls.length).toBeGreaterThan(0);
+        const messages = calls.map(call => call[1]);
+        const hasWarning = messages.some(msg => msg.includes('Tidak dapat memuat daftar client') || msg.includes('DITBINMAS'));
+        expect(hasWarning).toBe(true);
+      }
+    });
+
+    it('should handle non-array clients response by defaulting to DITBINMAS', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock non-array response
+      mockFindAllActiveClients.mockResolvedValue({ client_id: 'WRONG' });
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 32345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Should send warning with default client
+        const calls = mockSendMessage.mock.calls.filter(call => call[0] === 32345);
+        expect(calls.length).toBeGreaterThan(0);
+        const messages = calls.map(call => call[1]);
+        const hasWarning = messages.some(msg => msg.includes('tidak valid') || msg.includes('DITBINMAS'));
+        expect(hasWarning).toBe(true);
+      }
+    });
+
+    it('should filter out invalid client objects missing client_id', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock clients with some invalid entries
+      mockFindAllActiveClients.mockResolvedValue([
+        { client_id: null, nama: 'Invalid Client' },
+        { client_id: 'CLIENT1', nama: 'Valid Client One' },
+        { nama: 'No ID Client' },
+        { client_id: '', nama: 'Empty ID Client' },
+        { client_id: '   ', nama: 'Whitespace ID Client' },
+        { client_id: 'CLIENT2', nama: 'Valid Client Two' },
+      ]);
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 42345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Should show client menu with only valid clients
+        const calls = mockSendMessage.mock.calls.filter(call => call[0] === 42345);
+        expect(calls.length).toBeGreaterThan(0);
+        const messages = calls.map(call => call[1]);
+        const hasClientMenu = messages.some(msg => msg.includes('CLIENT1') && msg.includes('CLIENT2'));
+        expect(hasClientMenu).toBe(true);
+        // Should not include invalid entries
+        const hasInvalidEntries = messages.some(msg => 
+          msg.includes('Invalid Client') || 
+          msg.includes('No ID Client') || 
+          msg.includes('Empty ID Client') ||
+          msg.includes('Whitespace ID Client')
+        );
+        expect(hasInvalidEntries).toBe(false);
+      }
+    });
+
+    it('should default to DITBINMAS when all clients are invalid', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock clients with all invalid entries
+      mockFindAllActiveClients.mockResolvedValue([
+        { client_id: null, nama: 'Invalid Client 1' },
+        { nama: 'Invalid Client 2' },
+        { client_id: '', nama: 'Invalid Client 3' },
+      ]);
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 52345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Should send warning with default client
+        const calls = mockSendMessage.mock.calls.filter(call => call[0] === 52345);
+        expect(calls.length).toBeGreaterThan(0);
+        const messages = calls.map(call => call[1]);
+        const hasWarning = messages.some(msg => msg.includes('tidak valid') || msg.includes('DITBINMAS'));
+        expect(hasWarning).toBe(true);
+      }
+    });
+
     it('should display client selection menu when clients are available', async () => {
       await initializeTelegramClientBot('test-token', true);
       

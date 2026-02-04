@@ -220,6 +220,18 @@ async function sendMainMenu(chatId) {
 }
 
 /**
+ * Validate if a client object is valid
+ * @param {object} client - Client object to validate
+ * @returns {boolean} True if client is valid, false otherwise
+ */
+function isValidClient(client) {
+  if (!client || !client.client_id || client.client_id.trim() === '') {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Show client selection menu to the user
  * @param {number} chatId - Telegram chat ID
  */
@@ -230,10 +242,39 @@ async function showClientSelection(chatId) {
   }
   
   try {
+    console.log('[Telegram Client Bot] Fetching active clients for chat:', chatId);
     const clients = await findAllActiveClients();
     
-    if (!clients || clients.length === 0) {
+    // Validate clients response
+    if (!clients) {
+      console.error('[Telegram Client Bot] findAllActiveClients returned null or undefined');
+      // Use default client as fallback
+      userSessions.set(chatId, { 
+        selectedClientId: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      await clientBot.sendMessage(chatId, `⚠️ Tidak dapat memuat daftar client. Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu atau ketik /menu untuk melihat daftar menu.`);
+      await sendMainMenu(chatId);
+      return;
+    }
+    
+    if (!Array.isArray(clients)) {
+      console.error('[Telegram Client Bot] findAllActiveClients returned non-array:', typeof clients);
+      // Use default client as fallback
+      userSessions.set(chatId, { 
+        selectedClientId: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      await clientBot.sendMessage(chatId, `⚠️ Data client tidak valid. Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu atau ketik /menu untuk melihat daftar menu.`);
+      await sendMainMenu(chatId);
+      return;
+    }
+    
+    console.log(`[Telegram Client Bot] Found ${clients.length} active clients`);
+    
+    if (clients.length === 0) {
       // No clients found, default to DITBINMAS
+      console.log('[Telegram Client Bot] No active clients found, using default:', DEFAULT_CLIENT_ID);
       userSessions.set(chatId, { 
         selectedClientId: DEFAULT_CLIENT_ID,
         step: 'menu'
@@ -243,34 +284,81 @@ async function showClientSelection(chatId) {
       return;
     }
     
+    // Validate client objects have required fields
+    const validClients = clients.filter(client => {
+      if (!isValidClient(client)) {
+        console.warn('[Telegram Client Bot] Invalid client object found:', client);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validClients.length === 0) {
+      console.error('[Telegram Client Bot] All clients are invalid');
+      // Use default client as fallback
+      userSessions.set(chatId, { 
+        selectedClientId: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      await clientBot.sendMessage(chatId, `⚠️ Data client tidak valid. Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu atau ketik /menu untuk melihat daftar menu.`);
+      await sendMainMenu(chatId);
+      return;
+    }
+    
+    if (validClients.length < clients.length) {
+      console.warn(`[Telegram Client Bot] Filtered out ${clients.length - validClients.length} invalid clients`);
+    }
+    
     // Create client selection menu
     let clientMenu = '📋 *Pilih Client*\n\n';
     clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
     
     // Display up to 10 clients with emoji numbers
-    clients.slice(0, 10).forEach((client, index) => {
+    validClients.slice(0, 10).forEach((client, index) => {
       const numberEmoji = NUMBER_EMOJIS[index];
       const nama = client.nama || client.client_id;
       clientMenu += `${numberEmoji} ${client.client_id} - ${nama}\n`;
     });
     
-    if (clients.length > 10) {
-      clientMenu += '\n... dan ' + (clients.length - 10) + ' client lainnya\n';
+    if (validClients.length > 10) {
+      clientMenu += '\n... dan ' + (validClients.length - 10) + ' client lainnya\n';
     }
     
-    clientMenu += '\nBalas dengan *angka* (1-' + Math.min(10, clients.length) + ') atau *Client ID* yang tertera.';
+    clientMenu += '\nBalas dengan *angka* (1-' + Math.min(10, validClients.length) + ') atau *Client ID* yang tertera.';
     
     // Store clients in session
     userSessions.set(chatId, {
       step: 'choose_client',
-      clients: clients
+      clients: validClients
     });
     
+    console.log('[Telegram Client Bot] Sending client selection menu to chat:', chatId);
     await clientBot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
+    console.log('[Telegram Client Bot] Client selection menu sent successfully');
   } catch (error) {
     console.error('[Telegram Client Bot] Error showing client selection:', error);
+    console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    // Provide sanitized error message to avoid leaking sensitive system information
+    let errorMessage = '❌ Terjadi kesalahan saat mengambil daftar client.\n\n';
+    
+    // Only include error type, not full details that might contain sensitive info
+    if (error.message) {
+      // Check if error is database-related
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Detail: Permintaan timeout.\n\n';
+      } else {
+        // Generic error message without sensitive details
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
+    }
+    
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
     if (clientBot) {
-      await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan saat mengambil daftar client. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+      await clientBot.sendMessage(chatId, errorMessage);
     }
   }
 }
@@ -288,35 +376,64 @@ async function handleClientSelection(chatId, text, from) {
   }
   
   try {
+    console.log(`[Telegram Client Bot] Processing client selection for chat ${chatId}, input: "${text}"`);
+    
     const session = userSessions.get(chatId);
     if (!session || !session.clients) {
+      console.warn('[Telegram Client Bot] Session not found or clients missing for chat:', chatId);
       await clientBot.sendMessage(chatId, '❌ Sesi tidak ditemukan. Silakan ketik /menu untuk memulai kembali.');
       return;
     }
     
     const clients = session.clients;
+    
+    if (!Array.isArray(clients) || clients.length === 0) {
+      console.error('[Telegram Client Bot] Invalid or empty clients array in session');
+      await clientBot.sendMessage(chatId, '❌ Data client tidak tersedia. Silakan ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
     let selectedClient = null;
     
     // Check if input is a number (1-10 for quick selection)
     if (/^\d+$/.test(text.trim())) {
       const index = parseInt(text.trim(), 10) - 1;
+      console.log(`[Telegram Client Bot] User selected index: ${index}`);
       if (index >= 0 && index < Math.min(10, clients.length)) {
         selectedClient = clients[index];
+        console.log(`[Telegram Client Bot] Selected client by index:`, selectedClient?.client_id);
+      } else {
+        console.warn(`[Telegram Client Bot] Index ${index} out of range (max: ${Math.min(10, clients.length) - 1})`);
       }
     }
     
     // If not found by number, try to match by client ID
     if (!selectedClient) {
       const inputUpper = text.trim().toUpperCase();
+      console.log(`[Telegram Client Bot] Searching for client by ID: "${inputUpper}"`);
       selectedClient = clients.find(c => 
         c.client_id && c.client_id.toUpperCase() === inputUpper
       );
+      if (selectedClient) {
+        console.log(`[Telegram Client Bot] Selected client by ID:`, selectedClient.client_id);
+      }
     }
     
     if (!selectedClient) {
+      console.warn(`[Telegram Client Bot] Client not found for input: "${text}"`);
       await clientBot.sendMessage(
         chatId, 
         '❌ Client tidak ditemukan. Silakan pilih nomor yang valid atau ketik Client ID yang benar.\n\nKetik /menu untuk melihat daftar client kembali.'
+      );
+      return;
+    }
+    
+    // Validate selected client has required fields
+    if (!selectedClient.client_id || selectedClient.client_id.trim() === '') {
+      console.error('[Telegram Client Bot] Selected client missing or has invalid client_id:', selectedClient);
+      await clientBot.sendMessage(
+        chatId, 
+        '❌ Data client tidak valid. Silakan ketik /menu untuk memulai kembali.'
       );
       return;
     }
@@ -327,6 +444,8 @@ async function handleClientSelection(chatId, text, from) {
       clientName: selectedClient.nama || selectedClient.client_id,
       step: 'menu'
     });
+    
+    console.log(`[Telegram Client Bot] Client selected successfully: ${selectedClient.client_id}`);
     
     const clientLabel = selectedClient.nama ? 
       `${escapeMarkdown(selectedClient.client_id)} - ${escapeMarkdown(selectedClient.nama)}` : 
@@ -342,8 +461,26 @@ async function handleClientSelection(chatId, text, from) {
     await sendMainMenu(chatId);
   } catch (error) {
     console.error('[Telegram Client Bot] Error handling client selection:', error);
+    console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    // Provide sanitized error message to avoid leaking sensitive system information
+    let errorMessage = '❌ Terjadi kesalahan saat memproses pilihan client.\n\n';
+    
+    // Only include error type, not full details that might contain sensitive info
+    if (error.message) {
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('session')) {
+        errorMessage += 'Detail: Sesi tidak valid.\n\n';
+      } else {
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
+    }
+    
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
     if (clientBot) {
-      await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+      await clientBot.sendMessage(chatId, errorMessage);
     }
   }
 }

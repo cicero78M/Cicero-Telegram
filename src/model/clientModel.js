@@ -34,8 +34,21 @@ export const findAll = async () => {
 
 // Ambil semua client dengan status aktif
 export const findAllActive = async () => {
-  const res = await query('SELECT * FROM clients WHERE client_status = true');
-  return res.rows;
+  try {
+    const res = await query('SELECT * FROM clients WHERE client_status = true');
+    
+    if (!res || !res.rows) {
+      console.error('[clientModel] findAllActive: Query returned invalid response');
+      throw new Error('Invalid query response - missing rows');
+    }
+    
+    console.log(`[clientModel] findAllActive: Found ${res.rows.length} active clients`);
+    return res.rows;
+  } catch (error) {
+    console.error('[clientModel] findAllActive: Database error:', error.message);
+    console.error('[clientModel] findAllActive: Error stack:', error.stack);
+    throw new Error(`Failed to fetch active clients: ${error.message}`);
+  }
 };
 
 export const findAllActiveOrgClients = async () => {
