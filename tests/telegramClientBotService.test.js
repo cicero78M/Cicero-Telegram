@@ -434,7 +434,7 @@ describe('Telegram Client Bot Service - Error Handling', () => {
             const message = inactiveClientMenu[1];
             expect(message).toContain('INACTIVE_ORG1');
             expect(message).toContain('INACTIVE_DIR1');
-            expect(message).toContain('⏸️'); // Inactive indicator
+            expect(message).toContain('⏸️');
           }
         }
       }

@@ -689,7 +689,7 @@ async function showInactiveClientSelection(chatId, page = 1) {
     }
     
     clientMenu += '\n*Pilih Client untuk Melihat Detail:*\n';
-    clientMenu += `• Ketik angka emoji di atas (1-${pageClients.length})\n`;
+    clientMenu += `• Ketik angka (1-${pageClients.length}) sesuai nomor client\n`;
     clientMenu += '• Ketik Client ID lengkap untuk melihat detail\n';
     clientMenu += '• Ketik *kembali* untuk kembali ke menu utama';
     
