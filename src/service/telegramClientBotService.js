@@ -192,6 +192,11 @@ function setupMessageHandlers() {
  * @param {number} chatId - Telegram chat ID
  */
 async function sendMainMenu(chatId) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in sendMainMenu');
+    return;
+  }
+  
   const menuText = 
     '📋 *Menu Client Request*\n\n' +
     'Pilih menu yang ingin Anda akses:\n\n' +
@@ -219,6 +224,11 @@ async function sendMainMenu(chatId) {
  * @param {number} chatId - Telegram chat ID
  */
 async function showClientSelection(chatId) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in showClientSelection');
+    return;
+  }
+  
   try {
     const clients = await findAllActiveClients();
     
@@ -259,7 +269,9 @@ async function showClientSelection(chatId) {
     await clientBot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('[Telegram Client Bot] Error showing client selection:', error);
-    await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan saat mengambil daftar client. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+    if (clientBot) {
+      await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan saat mengambil daftar client. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+    }
   }
 }
 
@@ -270,6 +282,11 @@ async function showClientSelection(chatId) {
  * @param {object} from - Telegram user info
  */
 async function handleClientSelection(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in handleClientSelection');
+    return;
+  }
+  
   try {
     const session = userSessions.get(chatId);
     if (!session || !session.clients) {
@@ -325,7 +342,9 @@ async function handleClientSelection(chatId, text, from) {
     await sendMainMenu(chatId);
   } catch (error) {
     console.error('[Telegram Client Bot] Error handling client selection:', error);
-    await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+    if (clientBot) {
+      await clientBot.sendMessage(chatId, '❌ Terjadi kesalahan. Silakan coba lagi atau ketik /menu untuk memulai ulang.');
+    }
   }
 }
 
@@ -336,6 +355,11 @@ async function handleClientSelection(chatId, text, from) {
  * @param {object} from - Telegram user info
  */
 async function handleMenuSelection(chatId, menuNumber, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in handleMenuSelection');
+    return;
+  }
+  
   try {
     console.log(`[Telegram Client Bot] Processing menu ${menuNumber} for chat ${chatId}`);
     
@@ -425,10 +449,12 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     }
   } catch (error) {
     console.error('[Telegram Client Bot] Error handling menu selection:', error);
-    await clientBot.sendMessage(
-      chatId, 
-      `❌ Terjadi kesalahan saat memproses menu ${menuNumber}.\n\nError: ${error.message}`
-    );
+    if (clientBot) {
+      await clientBot.sendMessage(
+        chatId, 
+        `❌ Terjadi kesalahan saat memproses menu ${menuNumber}.\n\nError: ${error.message}`
+      );
+    }
   }
 }
 
