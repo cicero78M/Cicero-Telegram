@@ -253,8 +253,9 @@ function isValidClient(client) {
  * Show client selection menu to the user with type filtering
  * @param {number} chatId - Telegram chat ID
  * @param {string} clientType - Optional client type filter ('org', 'direktorat', or 'all')
+ * @param {number} page - Optional page number for pagination (default: 1)
  */
-async function showClientSelection(chatId, clientType = null) {
+async function showClientSelection(chatId, clientType = null, page = 1) {
   if (!clientBot) {
     console.error('[Telegram Client Bot] Bot not initialized in showClientSelection');
     return;
@@ -369,12 +370,21 @@ async function showClientSelection(chatId, clientType = null) {
       console.warn(`[Telegram Client Bot] Filtered out ${clients.length - validClients.length} invalid clients`);
     }
     
+    // Get current page from session or default to 1
+    const session = userSessions.get(chatId) || {};
+    const currentPage = page !== undefined ? page : (session.currentPage || 1);
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(validClients.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, validClients.length);
+    const pageClients = validClients.slice(startIndex, endIndex);
+    
     // Create client selection menu
     let clientMenu = `📋 *Pilih Client - ${typeLabel}*\n\n`;
     clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
     
-    // Display up to 10 clients with emoji numbers
-    validClients.slice(0, 10).forEach((client, index) => {
+    // Display clients for current page with emoji numbers
+    pageClients.forEach((client, index) => {
       const numberEmoji = NUMBER_EMOJIS[index];
       const nama = escapeMarkdown(client.nama || client.client_id);
       const clientId = escapeMarkdown(client.client_id);
@@ -382,18 +392,31 @@ async function showClientSelection(chatId, clientType = null) {
       clientMenu += `${numberEmoji} ${clientId} - ${nama}${type}\n`;
     });
     
-    if (validClients.length > 10) {
-      clientMenu += '\n... dan ' + (validClients.length - 10) + ' client lainnya\n';
+    // Add pagination information if there are multiple pages
+    if (totalPages > 1) {
+      clientMenu += `\n📄 Halaman ${currentPage} dari ${totalPages} (Total: ${validClients.length} client)\n`;
+      clientMenu += '\nNavigasi:\n';
+      if (currentPage > 1) {
+        clientMenu += '• Ketik *prev* atau *p* untuk halaman sebelumnya\n';
+      }
+      if (currentPage < totalPages) {
+        clientMenu += '• Ketik *next* atau *n* untuk halaman berikutnya\n';
+      }
+      if (totalPages > 2) {
+        clientMenu += `• Ketik nomor halaman (1-${totalPages}) untuk langsung ke halaman tersebut\n`;
+      }
     }
     
-    clientMenu += '\nBalas dengan *angka* (1-' + Math.min(10, validClients.length) + ') atau *Client ID* yang tertera.';
+    clientMenu += '\nBalas dengan *angka* (1-' + pageClients.length + ') atau *Client ID* yang tertera.';
     clientMenu += '\nKetik *kembali* untuk memilih tipe client lain.';
     
-    // Store clients in session
+    // Store clients in session with pagination info
     userSessions.set(chatId, {
       step: 'choose_client',
       clients: validClients,
-      clientType: clientType
+      clientType: clientType,
+      currentPage: currentPage,
+      totalPages: totalPages
     });
     
     console.log('[Telegram Client Bot] Sending client selection menu to chat:', chatId);
@@ -626,17 +649,53 @@ async function handleClientSelection(chatId, text, from) {
       return;
     }
     
+    // Handle pagination commands
+    const currentPage = session.currentPage || 1;
+    const totalPages = session.totalPages || 1;
+    
+    // Check for next page
+    if ((input === 'next' || input === 'n') && currentPage < totalPages) {
+      console.log('[Telegram Client Bot] User requested next page');
+      await showClientSelection(chatId, session.clientType, currentPage + 1);
+      return;
+    }
+    
+    // Check for previous page
+    if ((input === 'prev' || input === 'p') && currentPage > 1) {
+      console.log('[Telegram Client Bot] User requested previous page');
+      await showClientSelection(chatId, session.clientType, currentPage - 1);
+      return;
+    }
+    
+    // Check if input is a page number
+    if (/^\d+$/.test(text.trim())) {
+      const num = parseInt(text.trim(), 10);
+      
+      // Check if it's a valid page number (not a client selection)
+      if (num > 10 && num <= totalPages) {
+        console.log(`[Telegram Client Bot] User requested page ${num}`);
+        await showClientSelection(chatId, session.clientType, num);
+        return;
+      }
+    }
+    
     let selectedClient = null;
     
     // Check if input is a number (1-10 for quick selection)
     if (/^\d+$/.test(text.trim())) {
       const index = parseInt(text.trim(), 10) - 1;
       console.log(`[Telegram Client Bot] User selected index: ${index}`);
-      if (index >= 0 && index < Math.min(10, clients.length)) {
-        selectedClient = clients[index];
+      
+      // Calculate the actual index based on current page
+      const itemsPerPage = 10;
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const pageClients = clients.slice(startIndex, startIndex + itemsPerPage);
+      
+      if (index >= 0 && index < pageClients.length) {
+        selectedClient = pageClients[index];
         console.log(`[Telegram Client Bot] Selected client by index:`, selectedClient?.client_id);
       } else {
-        console.warn(`[Telegram Client Bot] Index ${index} out of range (max: ${Math.min(10, clients.length) - 1})`);
+        console.warn(`[Telegram Client Bot] Index ${index} out of range (max: ${pageClients.length - 1})`);
       }
     }
     
