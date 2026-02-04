@@ -210,8 +210,12 @@ async function sendMainMenu(chatId) {
   // Build client info string for display
   let clientInfo = '\n';
   if (session && session.selectedClientId) {
-    const displayName = session.clientName || session.selectedClientId;
-    clientInfo = `\nClient aktif: *${session.selectedClientId}* - ${displayName}\n\n`;
+    // Show client ID and name, avoiding duplication when name equals ID
+    if (session.clientName && session.clientName !== session.selectedClientId) {
+      clientInfo = `\nClient aktif: *${session.selectedClientId}* - ${session.clientName}\n\n`;
+    } else {
+      clientInfo = `\nClient aktif: *${session.selectedClientId}*\n\n`;
+    }
   }
   
   const menuText = 
@@ -237,8 +241,7 @@ async function sendMainMenu(chatId) {
     '6️⃣ *Pilih/Ganti Client*\n' +
     '   Pilih atau ganti client aktif\n\n' +
     
-    'Ketik nomor menu untuk mengaksesnya.\n' +
-    'Contoh: ketik "1" untuk Tambah Client Baru';
+    'Ketik nomor menu untuk mengaksesnya.';
   
   await clientBot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
 }
