@@ -9,11 +9,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { runClientRequestAction } from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
-  findAllActiveClients,
-  findAllActiveDirektoratClients,
-  findAllActiveOrgClients,
-  findAllInactiveOrgClients,
-  findAllInactiveDirektoratClients
+  findAllActiveClients
 } from './clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
@@ -21,7 +17,7 @@ let clientBot = null;
 let isInitialized = false;
 // Store user sessions for client selection and menu navigation
 const userSessions = new Map();
-// Default client ID when no clients are available
+// Default client ID and name when no clients are available
 const DEFAULT_CLIENT_ID = 'DITBINMAS';
 // Number emojis for displaying client selection menu (supports up to 10 clients)
 const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
@@ -145,15 +141,19 @@ function setupCommandHandlers() {
       return;
     }
     
-    // Check if user already has a selected client
-    const session = userSessions.get(chatId);
-    if (session && session.selectedClientId) {
-      // User already has a client selected, show menu directly
-      await sendMainMenu(chatId);
-    } else {
-      // Show client selection first
-      await showClientSelection(chatId);
+    // Initialize session if not exists with default client
+    let session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId) {
+      userSessions.set(chatId, {
+        selectedClientId: DEFAULT_CLIENT_ID,
+        clientName: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      console.log(`[Telegram Client Bot] Initialized session with default client ${DEFAULT_CLIENT_ID} for chat ${chatId}`);
     }
+    
+    // Show menu directly - no client selection required
+    await sendMainMenu(chatId);
   });
 }
 
@@ -181,20 +181,8 @@ function setupMessageHandlers() {
     
     console.log(`[Telegram Client Bot] Message from chat ${chatId}: ${text}`);
     
-    // Check if user is in client type selection mode
-    const session = userSessions.get(chatId);
-    if (session && session.step === 'choose_client_type') {
-      await handleClientTypeSelection(chatId, text, msg.from);
-      return;
-    }
-    
-    // Check if user is in inactive client type selection mode
-    if (session && session.step === 'choose_inactive_client_type') {
-      await handleInactiveClientTypeSelection(chatId, text, msg.from);
-      return;
-    }
-    
     // Check if user is in client selection mode
+    const session = userSessions.get(chatId);
     if (session && session.step === 'choose_client') {
       await handleClientSelection(chatId, text, msg.from);
       return;
@@ -217,24 +205,43 @@ async function sendMainMenu(chatId) {
     return;
   }
   
+  const session = userSessions.get(chatId);
+  
+  // Build client info string for display
+  let clientInfo = '\n';
+  if (session && session.selectedClientId) {
+    // Show client ID and name, avoiding duplication when name equals ID
+    if (session.clientName && session.clientName !== session.selectedClientId) {
+      clientInfo = `\nClient aktif: *${session.selectedClientId}* - ${session.clientName}\n\n`;
+    } else {
+      clientInfo = `\nClient aktif: *${session.selectedClientId}*\n\n`;
+    }
+  }
+  
   const menuText = 
-    '📋 *Menu Client Request*\n\n' +
+    '📋 *Menu Client Request*\n' +
+    clientInfo +
     'Pilih menu yang ingin Anda akses:\n\n' +
     
-    '1️⃣ *Manajemen Client & User*\n' +
-    '   Kelola client dan user, tambah/update/hapus data\n\n' +
+    '1️⃣ *Tambah Client Baru*\n' +
+    '   Tambahkan client baru ke sistem\n\n' +
     
-    '2️⃣ *Operasional Media Sosial*\n' +
+    '2️⃣ *Manajemen Client & User*\n' +
+    '   Kelola client dan user, update/hapus data\n\n' +
+    
+    '3️⃣ *Operasional Media Sosial*\n' +
     '   Ambil konten, likes, komentar Instagram & TikTok\n\n' +
     
-    '3️⃣ *Transfer & Laporan*\n' +
+    '4️⃣ *Transfer & Laporan*\n' +
     '   Transfer user, export data, sinkronisasi\n\n' +
     
-    '4️⃣ *Administratif*\n' +
+    '5️⃣ *Administratif*\n' +
     '   Kelola komplain, broadcast, kontak Google\n\n' +
     
-    'Ketik nomor menu untuk mengaksesnya.\n' +
-    'Contoh: ketik "1" untuk Manajemen Client & User';
+    '6️⃣ *Pilih/Ganti Client*\n' +
+    '   Pilih atau ganti client aktif\n\n' +
+    
+    'Ketik nomor menu untuk mengaksesnya.';
   
   await clientBot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
 }
@@ -252,61 +259,22 @@ function isValidClient(client) {
 }
 
 /**
- * Show client selection menu to the user with type filtering
+ * Show client selection menu to the user
+ * Simplified version - shows all active clients directly without type filtering
  * @param {number} chatId - Telegram chat ID
- * @param {string} clientType - Optional client type filter ('org', 'direktorat', or 'all')
  * @param {number} page - Optional page number for pagination (default: 1)
  */
-async function showClientSelection(chatId, clientType = null, page = 1) {
+async function showClientSelection(chatId, page = 1) {
   if (!clientBot) {
     console.error('[Telegram Client Bot] Bot not initialized in showClientSelection');
     return;
   }
   
   try {
-    // If no client type selected, show type selection first
-    if (!clientType) {
-      const typeMenu = 
-        '📋 *Pilih Tipe Client*\n\n' +
-        'Silakan pilih tipe client yang ingin Anda lihat:\n\n' +
-        '1️⃣ Semua Client Aktif\n' +
-        '2️⃣ Client Organisasi (ORG)\n' +
-        '3️⃣ Client Direktorat\n' +
-        '4️⃣ Semua Client Inactive\n\n' +
-        'Ketik angka 1-4 untuk memilih.';
-      
-      // Store the selection step in session
-      userSessions.set(chatId, {
-        step: 'choose_client_type'
-      });
-      
-      await clientBot.sendMessage(chatId, typeMenu, { parse_mode: 'Markdown' });
-      return;
-    }
+    console.log(`[Telegram Client Bot] Fetching all active clients for chat:`, chatId);
     
-    console.log(`[Telegram Client Bot] Fetching clients for type: ${clientType || 'all'} for chat:`, chatId);
-    
-    let clients = [];
-    let typeLabel = '';
-    
-    // Fetch clients based on type
-    if (clientType === 'org') {
-      clients = await findAllActiveOrgClients();
-      typeLabel = 'Organisasi (ORG)';
-    } else if (clientType === 'direktorat') {
-      clients = await findAllActiveDirektoratClients();
-      typeLabel = 'Direktorat';
-    } else if (clientType === 'org_inactive') {
-      clients = await findAllInactiveOrgClients();
-      typeLabel = 'Organisasi (ORG) Inactive';
-    } else if (clientType === 'direktorat_inactive') {
-      clients = await findAllInactiveDirektoratClients();
-      typeLabel = 'Direktorat Inactive';
-    } else {
-      // 'all' or null - fetch all active clients
-      clients = await findAllActiveClients();
-      typeLabel = 'Semua';
-    }
+    // Fetch all active clients - simplified approach
+    const clients = await findAllActiveClients();
     
     // Validate clients response
     if (!clients) {
@@ -333,16 +301,16 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       return;
     }
     
-    console.log(`[Telegram Client Bot] Found ${clients.length} clients for type ${clientType}`);
+    console.log(`[Telegram Client Bot] Found ${clients.length} active clients`);
     
     if (clients.length === 0) {
       // No clients found, default to DITBINMAS
-      console.log('[Telegram Client Bot] No clients found for type, using default:', DEFAULT_CLIENT_ID);
+      console.log('[Telegram Client Bot] No clients found, using default:', DEFAULT_CLIENT_ID);
       userSessions.set(chatId, { 
         selectedClientId: DEFAULT_CLIENT_ID,
         step: 'menu'
       });
-      await clientBot.sendMessage(chatId, `✅ Tidak ada client ${typeLabel} yang aktif. Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu atau ketik /menu untuk melihat daftar menu.`);
+      await clientBot.sendMessage(chatId, `✅ Tidak ada client yang aktif. Menggunakan client ${DEFAULT_CLIENT_ID} sebagai default.\n\nSilakan pilih menu dengan mengetik nomor menu atau ketik /menu untuk melihat daftar menu.`);
       await sendMainMenu(chatId);
       return;
     }
@@ -379,7 +347,7 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
     const pageClients = validClients.slice(startIndex, endIndex);
     
     // Create client selection menu
-    let clientMenu = `📋 *Pilih Client - ${typeLabel}*\n\n`;
+    let clientMenu = `📋 *Pilih Client*\n\n`;
     clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
     
     // Display clients for current page with emoji numbers
@@ -409,13 +377,12 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
     clientMenu += '\n*Pilih Client:*\n';
     clientMenu += `• Ketik angka emoji di atas (1-${pageClients.length})\n`;
     clientMenu += '• Ketik Client ID lengkap untuk pilih langsung\n';
-    clientMenu += '• Ketik *kembali* untuk memilih tipe client lain';
+    clientMenu += '• Ketik *kembali* untuk kembali ke menu utama';
     
     // Store clients in session with pagination info
     userSessions.set(chatId, {
       step: 'choose_client',
       clients: validClients,
-      clientType: clientType,
       currentPage: page,
       totalPages: totalPages
     });
@@ -443,166 +410,6 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       }
     }
     
-    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
-    
-    if (clientBot) {
-      await clientBot.sendMessage(chatId, errorMessage);
-    }
-  }
-}
-
-/**
- * Show inactive client submenu to the user
- * @param {number} chatId - Telegram chat ID
- */
-async function showInactiveClientSubmenu(chatId) {
-  if (!clientBot) {
-    console.error('[Telegram Client Bot] Bot not initialized in showInactiveClientSubmenu');
-    return;
-  }
-  
-  try {
-    const submenuText = 
-      '📋 *Semua Client Inactive*\n\n' +
-      'Pilih tipe client inactive yang ingin Anda lihat:\n\n' +
-      '1️⃣ Client Organisasi (ORG) Inactive\n' +
-      '2️⃣ Client Direktorat Inactive\n\n' +
-      'Ketik angka 1-2 untuk memilih.\n' +
-      'Ketik *kembali* untuk kembali ke menu tipe client.';
-    
-    // Store the selection step in session
-    userSessions.set(chatId, {
-      step: 'choose_inactive_client_type'
-    });
-    
-    await clientBot.sendMessage(chatId, submenuText, { parse_mode: 'Markdown' });
-  } catch (error) {
-    console.error('[Telegram Client Bot] Error showing inactive client submenu:', error);
-    console.error('[Telegram Client Bot] Error stack:', error.stack);
-    
-    let errorMessage = '❌ Terjadi kesalahan saat menampilkan submenu client inactive.\n\n';
-    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
-    
-    if (clientBot) {
-      await clientBot.sendMessage(chatId, errorMessage);
-    }
-  }
-}
-
-/**
- * Handle inactive client type selection from user
- * @param {number} chatId - Telegram chat ID
- * @param {string} text - User input (1 or 2)
- * @param {object} from - Telegram user info
- */
-async function handleInactiveClientTypeSelection(chatId, text, from) {
-  if (!clientBot) {
-    console.error('[Telegram Client Bot] Bot not initialized in handleInactiveClientTypeSelection');
-    return;
-  }
-  
-  try {
-    console.log(`[Telegram Client Bot] Processing inactive client type selection for chat ${chatId}, input: "${text}"`);
-    
-    const input = (text || '').trim().toLowerCase();
-    
-    // Check if user wants to go back
-    if (input === 'kembali' || input === 'back') {
-      console.log('[Telegram Client Bot] User requested to go back to type selection');
-      await showClientSelection(chatId, null);
-      return;
-    }
-    
-    if (!input) {
-      await clientBot.sendMessage(chatId, '❌ Pilihan tidak valid. Silakan ketik nomor 1-2.');
-      return;
-    }
-    
-    let clientType = null;
-    
-    // Map input to inactive client type
-    switch (input) {
-      case '1':
-        clientType = 'org_inactive';
-        break;
-      case '2':
-        clientType = 'direktorat_inactive';
-        break;
-      default:
-        await clientBot.sendMessage(chatId, '❌ Pilihan tidak valid. Silakan ketik nomor 1-2 atau ketik *kembali* untuk kembali ke menu sebelumnya.', { parse_mode: 'Markdown' });
-        return;
-    }
-    
-    console.log(`[Telegram Client Bot] Inactive client type selected: ${clientType}`);
-    
-    // Show client selection for the chosen inactive type
-    await showClientSelection(chatId, clientType);
-  } catch (error) {
-    console.error('[Telegram Client Bot] Error handling inactive client type selection:', error);
-    console.error('[Telegram Client Bot] Error stack:', error.stack);
-    
-    let errorMessage = '❌ Terjadi kesalahan saat memproses pilihan tipe client inactive.\n\n';
-    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
-    
-    if (clientBot) {
-      await clientBot.sendMessage(chatId, errorMessage);
-    }
-  }
-}
-
-/**
- * Handle client type selection from user
- * @param {number} chatId - Telegram chat ID
- * @param {string} text - User input (1, 2, 3, or 4)
- * @param {object} from - Telegram user info
- */
-async function handleClientTypeSelection(chatId, text, from) {
-  if (!clientBot) {
-    console.error('[Telegram Client Bot] Bot not initialized in handleClientTypeSelection');
-    return;
-  }
-  
-  try {
-    console.log(`[Telegram Client Bot] Processing client type selection for chat ${chatId}, input: "${text}"`);
-    
-    const input = (text || '').trim();
-    
-    if (!input) {
-      await clientBot.sendMessage(chatId, '❌ Pilihan tidak valid. Silakan ketik nomor 1-4.');
-      return;
-    }
-    
-    let clientType = null;
-    
-    // Map input to client type
-    switch (input) {
-      case '1':
-        clientType = 'all';
-        break;
-      case '2':
-        clientType = 'org';
-        break;
-      case '3':
-        clientType = 'direktorat';
-        break;
-      case '4':
-        // Show submenu for inactive clients
-        await showInactiveClientSubmenu(chatId);
-        return;
-      default:
-        await clientBot.sendMessage(chatId, '❌ Pilihan tidak valid. Silakan ketik nomor 1-4 atau ketik /menu untuk memulai ulang.');
-        return;
-    }
-    
-    console.log(`[Telegram Client Bot] Client type selected: ${clientType}`);
-    
-    // Show client selection for the chosen type
-    await showClientSelection(chatId, clientType);
-  } catch (error) {
-    console.error('[Telegram Client Bot] Error handling client type selection:', error);
-    console.error('[Telegram Client Bot] Error stack:', error.stack);
-    
-    let errorMessage = '❌ Terjadi kesalahan saat memproses pilihan tipe client.\n\n';
     errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
     
     if (clientBot) {
@@ -643,10 +450,10 @@ async function handleClientSelection(chatId, text, from) {
     
     const input = (text || '').trim().toLowerCase();
     
-    // Check if user wants to go back to type selection
+    // Check if user wants to go back to main menu
     if (input === 'kembali' || input === 'back') {
-      console.log('[Telegram Client Bot] User requested to go back to type selection');
-      await showClientSelection(chatId, null);
+      console.log('[Telegram Client Bot] User requested to go back to main menu');
+      await sendMainMenu(chatId);
       return;
     }
     
@@ -657,14 +464,14 @@ async function handleClientSelection(chatId, text, from) {
     // Check for next page
     if ((input === 'next' || input === 'n') && currentPage < totalPages) {
       console.log('[Telegram Client Bot] User requested next page');
-      await showClientSelection(chatId, session.clientType, currentPage + 1);
+      await showClientSelection(chatId, currentPage + 1);
       return;
     }
     
     // Check for previous page
     if ((input === 'prev' || input === 'p') && currentPage > 1) {
       console.log('[Telegram Client Bot] User requested previous page');
-      await showClientSelection(chatId, session.clientType, currentPage - 1);
+      await showClientSelection(chatId, currentPage - 1);
       return;
     }
     
@@ -676,7 +483,7 @@ async function handleClientSelection(chatId, text, from) {
       // If number is greater than items per page, treat as page navigation
       if (num > ITEMS_PER_PAGE && num <= totalPages) {
         console.log(`[Telegram Client Bot] User requested page ${num}`);
-        await showClientSelection(chatId, session.clientType, num);
+        await showClientSelection(chatId, num);
         return;
       }
     }
@@ -793,6 +600,13 @@ async function handleMenuSelection(chatId, menuNumber, from) {
   try {
     console.log(`[Telegram Client Bot] Processing menu ${menuNumber} for chat ${chatId}`);
     
+    // Handle menu 6 (Choose/Change Client) - special case
+    if (menuNumber === '6') {
+      console.log('[Telegram Client Bot] User selected menu 6 - Choose/Change Client');
+      await showClientSelection(chatId);
+      return;
+    }
+    
     // Get user session to retrieve selected client
     const session = userSessions.get(chatId);
     let clientId = DEFAULT_CLIENT_ID; // Default fallback
@@ -801,12 +615,13 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     if (session && session.selectedClientId) {
       clientId = session.selectedClientId;
     } else {
-      // No client selected yet, prompt user to select client first
-      await clientBot.sendMessage(
-        chatId, 
-        '⚠️ Silakan pilih client terlebih dahulu. Ketik /menu untuk memulai.'
-      );
-      return;
+      // Initialize with default client if no session exists
+      userSessions.set(chatId, {
+        selectedClientId: DEFAULT_CLIENT_ID,
+        clientName: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      clientId = DEFAULT_CLIENT_ID;
     }
     
     // Send processing message

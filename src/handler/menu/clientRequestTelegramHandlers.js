@@ -11,6 +11,11 @@ import { getGreeting, formatNama } from "../../utils/utilsHelper.js";
 
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
 
+// Standard message for features under development
+const FEATURE_IN_DEVELOPMENT_MSG = 
+  `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
+  `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
+
 /**
  * Main performAction function for client request menu
  * Processes menu selections and returns formatted text responses
@@ -34,21 +39,26 @@ async function performAction(
 
     switch (action) {
       case "1": {
+        // Tambah Client Baru
+        msg = await handleAddClientMenu(targetId, clientLabel);
+        break;
+      }
+      case "2": {
         // Manajemen Client & User
         msg = await handleManagementMenu(targetId, clientLabel);
         break;
       }
-      case "2": {
+      case "3": {
         // Operasional Media Sosial
         msg = await handleSocialMediaMenu(targetId, clientLabel);
         break;
       }
-      case "3": {
+      case "4": {
         // Transfer & Laporan
         msg = await handleTransferReportMenu(targetId, clientLabel);
         break;
       }
-      case "4": {
+      case "5": {
         // Administratif
         msg = await handleAdminMenu(targetId, clientLabel);
         break;
@@ -65,7 +75,25 @@ async function performAction(
 }
 
 /**
- * Handle Management menu (menu 1)
+ * Handle Add Client menu (menu 1)
+ */
+async function handleAddClientMenu(clientId, clientLabel) {
+  const salam = getGreeting();
+  return `${salam}!\n\n` +
+    `➕ *Tambah Client Baru*\n\n` +
+    `Fitur untuk menambahkan client baru ke sistem.\n\n` +
+    `Informasi yang diperlukan:\n` +
+    `• Client ID (unik)\n` +
+    `• Nama Client\n` +
+    `• Tipe Client (ORG/DIREKTORAT)\n` +
+    `• Status Client (Aktif/Tidak Aktif)\n` +
+    `• Regional ID (untuk DIREKTORAT)\n` +
+    `• Parent Client ID (opsional)\n\n` +
+    FEATURE_IN_DEVELOPMENT_MSG;
+}
+
+/**
+ * Handle Management menu (menu 2)
  */
 async function handleManagementMenu(clientId, clientLabel) {
   const salam = getGreeting();
@@ -73,18 +101,16 @@ async function handleManagementMenu(clientId, clientLabel) {
     `📋 *Manajemen Client & User*\n` +
     `Client: ${clientLabel}\n\n` +
     `Menu manajemen client dan user mencakup:\n` +
-    `• Tambah client baru\n` +
     `• Kelola client (update/hapus/info)\n` +
     `• Kelola user (update/exception/status)\n` +
     `• Hapus WA User\n` +
     `• Penghapusan Massal Status User\n` +
     `• Refresh Aggregator Direktorat\n\n` +
-    `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    FEATURE_IN_DEVELOPMENT_MSG;
 }
 
 /**
- * Handle Social Media Operations menu (menu 2)
+ * Handle Social Media Operations menu (menu 3)
  */
 async function handleSocialMediaMenu(clientId, clientLabel) {
   const salam = getGreeting();
@@ -98,12 +124,11 @@ async function handleSocialMediaMenu(clientId, clientLabel) {
     `• Ambil komentar TikTok\n` +
     `• Hapus konten TikTok\n` +
     `• Cek status akun\n\n` +
-    `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    FEATURE_IN_DEVELOPMENT_MSG;
 }
 
 /**
- * Handle Transfer & Report menu (menu 3)
+ * Handle Transfer & Report menu (menu 4)
  */
 async function handleTransferReportMenu(clientId, clientLabel) {
   const salam = getGreeting();
@@ -115,12 +140,11 @@ async function handleTransferReportMenu(clientId, clientLabel) {
     `• Laporan user per client\n` +
     `• Export data user\n` +
     `• Sinkronisasi data\n\n` +
-    `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    FEATURE_IN_DEVELOPMENT_MSG;
 }
 
 /**
- * Handle Administrative menu (menu 4)
+ * Handle Administrative menu (menu 5)
  */
 async function handleAdminMenu(clientId, clientLabel) {
   const salam = getGreeting();
@@ -133,8 +157,7 @@ async function handleAdminMenu(clientId, clientLabel) {
     `• Manajemen kontak Google\n` +
     `• Update data client\n` +
     `• Kelola Akun Resmi Satbinmas\n\n` +
-    `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    FEATURE_IN_DEVELOPMENT_MSG;
 }
 
 /**
@@ -174,6 +197,7 @@ export async function runClientRequestAction({
  */
 export const clientRequestTelegramHandlers = {
   performAction,
+  handleAddClientMenu,
   handleManagementMenu,
   handleSocialMediaMenu,
   handleTransferReportMenu,
