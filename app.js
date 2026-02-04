@@ -3,6 +3,7 @@ import { env } from './src/config/env.js';
 import { initializeTelegramDirektoratBot } from './src/service/telegramDirektoratBotService.js';
 import { initializeTelegramOperatorBot } from './src/service/telegramOperatorBotService.js';
 import { initializeTelegramUserBot } from './src/service/telegramUserBotService.js';
+import { initializeTelegramClientBot } from './src/service/telegramClientBotService.js';
 
 console.log('Cicero backend initialized - web endpoints have been removed');
 console.log('Application services are available for internal use');
@@ -59,5 +60,23 @@ if (env.TELEGRAM_USER_BOT_ENABLED) {
     });
 } else {
   console.log('[App] Telegram User Bot is disabled');
+}
+
+// Initialize Telegram Client Bot if enabled
+if (env.TELEGRAM_CLIENT_BOT_ENABLED) {
+  console.log('[App] Telegram Client Bot is enabled, initializing...');
+  initializeTelegramClientBot(env.TELEGRAM_CLIENT_BOT_TOKEN, env.TELEGRAM_CLIENT_BOT_ENABLED)
+    .then((bot) => {
+      if (bot) {
+        console.log('[App] Telegram Client Bot started successfully');
+      } else {
+        console.log('[App] Telegram Client Bot failed to start');
+      }
+    })
+    .catch((error) => {
+      console.error('[App] Error starting Telegram Client Bot:', error);
+    });
+} else {
+  console.log('[App] Telegram Client Bot is disabled');
 }
 
