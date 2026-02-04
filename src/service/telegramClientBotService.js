@@ -247,6 +247,18 @@ function setupMessageHandlers() {
       return;
     }
     
+    // Check if user is selecting status field to update
+    if (session && session.step === 'update_status_field_selection') {
+      await handleUpdateStatusFieldSelection(chatId, text.trim(), msg.from);
+      return;
+    }
+    
+    // Check if user is confirming status field update
+    if (session && session.step === 'update_status_field_confirmation') {
+      await handleUpdateStatusFieldConfirmation(chatId, text.trim().toUpperCase(), msg.from);
+      return;
+    }
+    
     // Check if it's a menu number
     if (text && /^\d+$/.test(text.trim())) {
       await handleMenuSelection(chatId, text.trim(), msg.from);
@@ -1320,6 +1332,29 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
       return;
     }
     
+    // Special handling for Update Status Client (2.1.4)
+    if (submenu === '1' && subaction === '4') {
+      // Set state to status field selection
+      userSessions.set(chatId, {
+        ...session,
+        step: 'update_status_field_selection'
+      });
+      
+      // Format client label using helper
+      const clientLabel = formatClientLabel(clientId, clientName);
+      
+      // Call the handler to show status field selection menu
+      const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
+        submenu,
+        subaction,
+        clientId,
+        clientLabel
+      );
+      
+      await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+      return;
+    }
+    
     // Reset to menu mode after action for other subactions
     userSessions.set(chatId, {
       ...session,
@@ -1487,6 +1522,164 @@ async function handleUpdateClientFieldValue(chatId, newValue, from) {
         ...session,
         step: 'menu',
         selectedField: undefined
+      });
+    }
+    
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}\n\nKetik /menu untuk kembali ke menu utama.`
+    );
+  }
+}
+
+/**
+ * Handle status field selection for status update
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} statusFieldNumber - Status field number (1-3)
+ * @param {object} from - User info from Telegram
+ */
+async function handleUpdateStatusFieldSelection(chatId, statusFieldNumber, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    
+    // Validate status field number
+    if (!['1', '2', '3'].includes(statusFieldNumber)) {
+      await clientBot.sendMessage(
+        chatId,
+        `❌ Pilihan tidak valid. Ketik nomor status yang valid (1-3) atau /menu untuk kembali.`
+      );
+      return;
+    }
+    
+    console.log(`[Telegram Client Bot] User selected status field ${statusFieldNumber} to update for client ${clientId}`);
+    
+    // Update session to status confirmation mode
+    userSessions.set(chatId, {
+      ...session,
+      step: 'update_status_field_confirmation',
+      selectedStatusField: statusFieldNumber
+    });
+    
+    // Format client label
+    const clientLabel = formatClientLabel(clientId, clientName);
+    
+    // Show confirmation prompt
+    const prompt = await clientRequestTelegramHandlers.handleStatusFieldUpdatePrompt(
+      clientId,
+      statusFieldNumber,
+      clientLabel
+    );
+    
+    await clientBot.sendMessage(chatId, prompt, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling status field selection:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Handle status field update confirmation
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} confirmation - User confirmation (already trimmed and uppercased)
+ * @param {object} from - User info from Telegram
+ */
+async function handleUpdateStatusFieldConfirmation(chatId, confirmation, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId || !session.selectedStatusField) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const statusFieldNumber = session.selectedStatusField;
+    
+    // Check for cancellation
+    if (confirmation === 'TIDAK' || confirmation === 'NO') {
+      console.log(`[Telegram Client Bot] Status update cancelled by user for client ${clientId}`);
+      
+      // Reset session to menu mode
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu',
+        selectedStatusField: undefined
+      });
+      
+      await clientBot.sendMessage(
+        chatId,
+        '❌ Update status dibatalkan.\n\nKetik /menu untuk kembali ke menu utama.'
+      );
+      return;
+    }
+    
+    // Check for confirmation
+    if (confirmation !== 'YA' && confirmation !== 'YES') {
+      await clientBot.sendMessage(
+        chatId,
+        '❌ Konfirmasi tidak valid. Ketik *YA* untuk konfirmasi atau *TIDAK* untuk membatalkan.',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    console.log(`[Telegram Client Bot] Processing status update for client ${clientId}, status field ${statusFieldNumber}`);
+    
+    // Show processing message
+    await clientBot.sendMessage(chatId, '⏳ Sedang memproses update status...');
+    
+    // Process the status update
+    const result = await clientRequestTelegramHandlers.processStatusFieldUpdate(
+      clientId,
+      statusFieldNumber
+    );
+    
+    // Reset session to menu mode
+    userSessions.set(chatId, {
+      ...session,
+      step: 'menu',
+      selectedStatusField: undefined
+    });
+    
+    // Send result
+    await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+    
+    // If successful, show menu again
+    if (result.success) {
+      await clientBot.sendMessage(
+        chatId,
+        'Ketik /menu untuk kembali ke menu utama.'
+      );
+    }
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling status confirmation:', error);
+    
+    // Reset session on error
+    const session = userSessions.get(chatId);
+    if (session) {
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu',
+        selectedStatusField: undefined
       });
     }
     

@@ -19,8 +19,17 @@ jest.unstable_mockModule('node-telegram-bot-api', () => ({
 
 // Mock clientRequestTelegramHandlers
 const mockRunClientRequestAction = jest.fn();
+const mockClientRequestTelegramHandlers = {
+  handleClientFieldUpdatePrompt: jest.fn(),
+  handleManagementSubmenu: jest.fn(),
+  handleStatusFieldUpdatePrompt: jest.fn(),
+  processClientFieldUpdate: jest.fn(),
+  processStatusFieldUpdate: jest.fn()
+};
 jest.unstable_mockModule('../src/handler/menu/clientRequestTelegramHandlers.js', () => ({
   runClientRequestAction: mockRunClientRequestAction,
+  clientRequestTelegramHandlers: mockClientRequestTelegramHandlers,
+  NUM_UPDATABLE_FIELDS: 6,
 }));
 
 // Mock clientService
@@ -31,6 +40,7 @@ const mockFindAllInactiveOrgClients = jest.fn();
 const mockFindAllInactiveDirektoratClients = jest.fn();
 const mockFindAllInactiveClients = jest.fn();
 const mockToggleClientStatus = jest.fn();
+const mockFindClientById = jest.fn();
 jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllActiveClients: mockFindAllActiveClients,
   findAllActiveDirektoratClients: mockFindAllActiveDirektoratClients,
@@ -39,6 +49,7 @@ jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllInactiveDirektoratClients: mockFindAllInactiveDirektoratClients,
   findAllInactiveClients: mockFindAllInactiveClients,
   toggleClientStatus: mockToggleClientStatus,
+  findClientById: mockFindClientById,
 }));
 
 // Mock telegramBotHelpers
