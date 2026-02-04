@@ -39,7 +39,7 @@ export const findAllActive = async () => {
     
     if (!res || !res.rows) {
       console.error('[clientModel] findAllActive: Query returned invalid response');
-      return [];
+      throw new Error('Invalid query response - missing rows');
     }
     
     console.log(`[clientModel] findAllActive: Found ${res.rows.length} active clients`);

@@ -220,6 +220,18 @@ async function sendMainMenu(chatId) {
 }
 
 /**
+ * Validate if a client object is valid
+ * @param {object} client - Client object to validate
+ * @returns {boolean} True if client is valid, false otherwise
+ */
+function isValidClient(client) {
+  if (!client || !client.client_id || client.client_id.trim() === '') {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Show client selection menu to the user
  * @param {number} chatId - Telegram chat ID
  */
@@ -274,7 +286,7 @@ async function showClientSelection(chatId) {
     
     // Validate client objects have required fields
     const validClients = clients.filter(client => {
-      if (!client || !client.client_id || client.client_id.trim() === '') {
+      if (!isValidClient(client)) {
         console.warn('[Telegram Client Bot] Invalid client object found:', client);
         return false;
       }
