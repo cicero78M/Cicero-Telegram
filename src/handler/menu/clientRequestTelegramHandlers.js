@@ -21,6 +21,19 @@ const FEATURE_IN_DEVELOPMENT_MSG =
   `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
 
 /**
+ * Format client label for display
+ * @param {object} client - Client object from database
+ * @param {string} clientId - Client ID fallback
+ * @returns {string} Formatted client label
+ */
+function formatClientLabel(client, clientId) {
+  if (client?.nama && client.nama !== clientId) {
+    return `${formatNama(client.nama)} (${clientId})`;
+  }
+  return clientId;
+}
+
+/**
  * Main performAction function for client request menu
  * Processes menu selections and returns formatted text responses
  * 
@@ -37,14 +50,12 @@ async function performAction(
   
   try {
     const client = await findClientById(targetId);
-    const clientLabel = client?.nama
-      ? `${formatNama(client.nama)} (${targetId})`
-      : targetId;
+    const clientLabel = formatClientLabel(client, targetId);
 
     switch (action) {
       case "1": {
         // Tambah Client Baru
-        msg = await handleAddClientMenu(targetId, clientLabel);
+        msg = await handleAddClientMenu();
         break;
       }
       case "2": {

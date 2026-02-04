@@ -37,6 +37,19 @@ const MIN_SPACE_THRESHOLD = 0.8;
 const MESSAGE_SEPARATOR = '━━━━━━━━━━━━━━━━━━━━━━';
 
 /**
+ * Format client label for display
+ * @param {string} clientId - Client ID
+ * @param {string} clientName - Client name from session or database
+ * @returns {string} Formatted client label
+ */
+function formatClientLabel(clientId, clientName) {
+  if (clientName && clientName !== clientId) {
+    return `${formatNama(clientName)} (${clientId})`;
+  }
+  return clientId;
+}
+
+/**
  * Initialize the Telegram Client Bot
  * @param {string} token - Telegram bot token
  * @param {boolean} enabled - Whether the bot is enabled
@@ -1079,12 +1092,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
         clientName: clientName
       });
       
-      // Show submenu
-      const client = await findClientById(clientId);
-      const clientLabel = client?.nama
-        ? `${formatNama(client.nama)} (${clientId})`
-        : clientId;
-      
+      // Show submenu (no need to fetch client as we have the name in session)
       const result = await runClientRequestAction({
         action: '2',
         clientId: clientId,
@@ -1230,10 +1238,8 @@ async function handleManagementSubmenuSelection(chatId, submenu, from) {
       });
     }
     
-    const client = await findClientById(clientId);
-    const clientLabel = client?.nama
-      ? `${formatNama(client.nama)} (${clientId})`
-      : clientId;
+    // Format client label using helper
+    const clientLabel = formatClientLabel(clientId, clientName);
     
     // Call the handler
     const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
@@ -1284,10 +1290,8 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
       step: 'menu'
     });
     
-    const client = await findClientById(clientId);
-    const clientLabel = client?.nama
-      ? `${formatNama(client.nama)} (${clientId})`
-      : clientId;
+    // Format client label using helper
+    const clientLabel = formatClientLabel(clientId, clientName);
     
     // Call the handler
     const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
