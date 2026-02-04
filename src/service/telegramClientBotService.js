@@ -234,6 +234,22 @@ function setupMessageHandlers() {
       return;
     }
     
+    // Check if user is in update client workflow
+    if (session && session.step === 'update_client_group') {
+      await handleUpdateClientGroupInput(chatId, text.trim(), msg.from);
+      return;
+    }
+    
+    if (session && session.step === 'update_client_field') {
+      await handleUpdateClientFieldInput(chatId, text.trim(), msg.from);
+      return;
+    }
+    
+    if (session && session.step === 'update_client_value') {
+      await handleUpdateClientValueInput(chatId, text.trim(), msg.from);
+      return;
+    }
+    
     // Check if it's a menu number
     if (text && /^\d+$/.test(text.trim())) {
       await handleMenuSelection(chatId, text.trim(), msg.from);
@@ -1284,11 +1300,19 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
     
     console.log(`[Telegram Client Bot] Processing subaction ${submenu}.${subaction} for client ${clientId}`);
     
-    // Reset to menu mode after action
-    userSessions.set(chatId, {
-      ...session,
-      step: 'menu'
-    });
+    // Special handling for Update Data Client - set to workflow mode
+    if (submenu === '1' && subaction === '1') {
+      userSessions.set(chatId, {
+        ...session,
+        step: 'update_client_group'
+      });
+    } else {
+      // Reset to menu mode after action
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu'
+      });
+    }
     
     // Format client label using helper
     const clientLabel = formatClientLabel(clientId, clientName);
@@ -1304,6 +1328,192 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
     await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error('[Telegram Client Bot] Error handling subaction:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Handle group selection in Update Data Client workflow
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input
+ * @param {object} from - User info from Telegram
+ */
+async function handleUpdateClientGroupInput(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    const clientLabel = formatClientLabel(clientId, clientName);
+    
+    // Parse group index (1-based to 0-based)
+    const groupIndex = parseInt(text) - 1;
+    
+    console.log(`[Telegram Client Bot] Update client group selection: ${text} (index: ${groupIndex})`);
+    
+    // Call the handler
+    const result = await clientRequestTelegramHandlers.handleUpdateClientGroupSelection(
+      groupIndex,
+      clientId,
+      clientLabel
+    );
+    
+    if (result.error) {
+      await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+      return;
+    }
+    
+    // Store selected group in session and move to field selection step
+    userSessions.set(chatId, {
+      ...session,
+      step: 'update_client_field',
+      updateClientGroup: result.selectedGroup
+    });
+    
+    await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling group input:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Handle field selection in Update Data Client workflow
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input
+ * @param {object} from - User info from Telegram
+ */
+async function handleUpdateClientFieldInput(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId || !session.updateClientGroup) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    const clientLabel = formatClientLabel(clientId, clientName);
+    
+    // Parse field index (1-based to 0-based)
+    const fieldIndex = parseInt(text) - 1;
+    
+    console.log(`[Telegram Client Bot] Update client field selection: ${text} (index: ${fieldIndex})`);
+    
+    // Call the handler
+    const result = await clientRequestTelegramHandlers.handleUpdateClientFieldSelection(
+      fieldIndex,
+      session.updateClientGroup,
+      clientLabel
+    );
+    
+    if (result.error) {
+      await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+      return;
+    }
+    
+    // Check if it's auto-sync field (tiktok_secuid)
+    if (result.autoSync) {
+      // Send the message
+      await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+      
+      // Immediately process the auto-sync
+      const syncResult = await clientRequestTelegramHandlers.handleUpdateClientValueInput(
+        '', // empty value for auto-sync
+        result.selectedField,
+        clientId
+      );
+      
+      // Reset to menu mode
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu',
+        updateClientGroup: undefined,
+        updateClientField: undefined
+      });
+      
+      await clientBot.sendMessage(chatId, syncResult.message, { parse_mode: 'Markdown' });
+      return;
+    }
+    
+    // Store selected field in session and move to value input step
+    userSessions.set(chatId, {
+      ...session,
+      step: 'update_client_value',
+      updateClientField: result.selectedField
+    });
+    
+    await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling field input:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Handle value input in Update Data Client workflow
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input
+ * @param {object} from - User info from Telegram
+ */
+async function handleUpdateClientValueInput(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId || !session.updateClientField) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    
+    console.log(`[Telegram Client Bot] Update client value input for field ${session.updateClientField.key}: ${text}`);
+    
+    // Call the handler
+    const result = await clientRequestTelegramHandlers.handleUpdateClientValueInput(
+      text,
+      session.updateClientField,
+      clientId
+    );
+    
+    // Reset to menu mode after update
+    userSessions.set(chatId, {
+      ...session,
+      step: 'menu',
+      updateClientGroup: undefined,
+      updateClientField: undefined
+    });
+    
+    await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling value input:', error);
     await clientBot.sendMessage(
       chatId,
       `❌ Terjadi kesalahan: ${error.message}`

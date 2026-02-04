@@ -8,10 +8,13 @@
 
 import { 
   findClientById, 
-  getClientSummary
+  getClientSummary,
+  updateClient
 } from "../../service/clientService.js";
 import { getGreeting, formatNama } from "../../utils/utilsHelper.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";
+import { normalizeHandleValue } from "../../utils/handleNormalizer.js";
+import { fetchTiktokProfile } from "../../service/tiktokRapidService.js";
 
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
 
@@ -19,6 +22,45 @@ const DITBINMAS_CLIENT_ID = "DITBINMAS";
 const FEATURE_IN_DEVELOPMENT_MSG = 
   `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
   `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
+
+// Field groups for client update workflow
+const CLIENT_UPDATE_FIELD_GROUPS = [
+  {
+    key: "identitas_tipe",
+    label: "Identitas & Tipe",
+    fields: [
+      { key: "client_type", label: "Tipe Client" },
+      { key: "client_group", label: "Group Client" },
+    ],
+  },
+  {
+    key: "kontak_wa",
+    label: "Kontak WA",
+    fields: [
+      { key: "client_operator", label: "Operator Client (WA)" },
+      { key: "client_super", label: "Super Admin Client (WA)" },
+    ],
+  },
+  {
+    key: "akun_sosmed",
+    label: "Akun Sosmed",
+    fields: [
+      { key: "client_insta", label: "Username Instagram" },
+      { key: "client_tiktok", label: "Username TikTok" },
+      { key: "tiktok_secuid", label: "TikTok SecUID" },
+    ],
+  },
+  {
+    key: "status_amplifikasi",
+    label: "Status & Amplifikasi",
+    fields: [
+      { key: "client_status", label: "Status Aktif (true/false)" },
+      { key: "client_insta_status", label: "Status IG Aktif (true/false)" },
+      { key: "client_tiktok_status", label: "Status TikTok Aktif (true/false)" },
+      { key: "client_amplify_status", label: "Status Amplifikasi (true/false)" },
+    ],
+  },
+];
 
 /**
  * Format client label for display
@@ -284,6 +326,258 @@ async function handleRefreshAggregator() {
 }
 
 /**
+ * Handle Update Data Client - Step 1: Show field groups
+ * @param {string} clientId - Client ID
+ * @param {string} clientLabel - Client label for display
+ * @returns {string} Response message with field groups
+ */
+async function handleUpdateClientStart(clientId, clientLabel) {
+  let msg = `📝 *Update Data Client*\n`;
+  msg += `Client: ${clientLabel}\n\n`;
+  msg += `Pilih kategori data yang ingin diperbarui:\n\n`;
+  
+  CLIENT_UPDATE_FIELD_GROUPS.forEach((group, index) => {
+    msg += `${index + 1}️⃣ *${group.label}*\n`;
+  });
+  
+  msg += `\nKetik nomor kategori (1-${CLIENT_UPDATE_FIELD_GROUPS.length}) atau /menu untuk kembali.`;
+  return msg;
+}
+
+/**
+ * Handle Update Data Client - Step 2: Show fields in selected group
+ * @param {string} groupIndex - Selected group index (0-based)
+ * @param {string} clientId - Client ID
+ * @param {string} clientLabel - Client label for display
+ * @returns {object} Response object with message and selected group info
+ */
+async function handleUpdateClientGroupSelection(groupIndex, clientId, clientLabel) {
+  const idx = parseInt(groupIndex);
+  
+  if (isNaN(idx) || idx < 0 || idx >= CLIENT_UPDATE_FIELD_GROUPS.length) {
+    return {
+      error: true,
+      message: `❌ Pilihan tidak valid. Ketik nomor kategori yang valid (1-${CLIENT_UPDATE_FIELD_GROUPS.length}).`
+    };
+  }
+  
+  const selectedGroup = CLIENT_UPDATE_FIELD_GROUPS[idx];
+  let msg = `📝 *Update Data Client - ${selectedGroup.label}*\n`;
+  msg += `Client: ${clientLabel}\n\n`;
+  msg += `Pilih field yang ingin diupdate:\n\n`;
+  
+  selectedGroup.fields.forEach((field, index) => {
+    msg += `${index + 1}️⃣ *${field.label}*\n`;
+    msg += `   (${field.key})\n`;
+  });
+  
+  msg += `\nKetik nomor field (1-${selectedGroup.fields.length}) atau /menu untuk kembali.`;
+  
+  return {
+    error: false,
+    message: msg,
+    selectedGroup: selectedGroup
+  };
+}
+
+/**
+ * Handle Update Data Client - Step 3: Prompt for field value
+ * @param {string} fieldIndex - Selected field index (0-based)
+ * @param {object} selectedGroup - Currently selected group
+ * @param {string} clientLabel - Client label for display
+ * @returns {object} Response object with message and selected field info
+ */
+async function handleUpdateClientFieldSelection(fieldIndex, selectedGroup, clientLabel) {
+  if (!selectedGroup || !selectedGroup.fields) {
+    return {
+      error: true,
+      message: `❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.`
+    };
+  }
+  
+  const idx = parseInt(fieldIndex);
+  
+  if (isNaN(idx) || idx < 0 || idx >= selectedGroup.fields.length) {
+    return {
+      error: true,
+      message: `❌ Pilihan tidak valid. Ketik nomor field yang valid (1-${selectedGroup.fields.length}).`
+    };
+  }
+  
+  const selectedField = selectedGroup.fields[idx];
+  
+  // Special case for tiktok_secuid - auto-sync from existing username
+  if (selectedField.key === 'tiktok_secuid') {
+    return {
+      error: false,
+      autoSync: true,
+      message: `🔄 *Sinkronisasi TikTok SecUID*\n\nSecUID akan disinkronkan otomatis dari username TikTok yang tersimpan.\n\nMenunggu konfirmasi...`,
+      selectedField: selectedField
+    };
+  }
+  
+  let msg = `📝 *Update Data Client - ${selectedField.label}*\n`;
+  msg += `Client: ${clientLabel}\n\n`;
+  msg += `Masukkan nilai baru untuk *${selectedField.label}*:\n\n`;
+  
+  // Add hints for specific field types
+  if (selectedField.key.includes('status')) {
+    msg += `💡 Untuk field status, masukkan:\n`;
+    msg += `• *true* untuk aktif\n`;
+    msg += `• *false* untuk tidak aktif\n\n`;
+  } else if (selectedField.key === 'client_tiktok') {
+    msg += `💡 Masukkan username TikTok tanpa @\n`;
+    msg += `(SecUID akan disinkronkan otomatis)\n\n`;
+  } else if (selectedField.key === 'client_insta') {
+    msg += `💡 Masukkan username Instagram tanpa @\n\n`;
+  }
+  
+  msg += `Ketik nilai baru atau /menu untuk kembali.`;
+  
+  return {
+    error: false,
+    autoSync: false,
+    message: msg,
+    selectedField: selectedField
+  };
+}
+
+/**
+ * Handle Update Data Client - Step 4: Update field value
+ * @param {string} value - New value for the field
+ * @param {object} selectedField - Currently selected field
+ * @param {string} clientId - Client ID
+ * @returns {Promise<object>} Response object with success status and message
+ */
+async function handleUpdateClientValueInput(value, selectedField, clientId) {
+  if (!selectedField || !clientId) {
+    return {
+      success: false,
+      message: `❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.`
+    };
+  }
+  
+  try {
+    const trimmedValue = value.trim();
+    let updateData = {};
+    let additionalInfo = '';
+    
+    // Special handling for TikTok username - also sync secUid
+    if (selectedField.key === 'client_tiktok') {
+      const normalizedHandle = normalizeHandleValue(trimmedValue);
+      if (!normalizedHandle) {
+        return {
+          success: false,
+          message: `❌ Username TikTok tidak valid. Masukkan username TikTok tanpa spasi.`
+        };
+      }
+      
+      const username = normalizedHandle.replace(/^@/, '');
+      let secUid = null;
+      
+      try {
+        const profile = await fetchTiktokProfile(username);
+        secUid = profile?.secUid || null;
+        if (secUid) {
+          additionalInfo = `\n✅ SecUID berhasil disinkronkan.`;
+        } else {
+          additionalInfo = `\n⚠️ Gagal mengambil SecUID dari RapidAPI.`;
+        }
+      } catch (error) {
+        additionalInfo = `\n⚠️ Gagal mengambil SecUID: ${error.message}`;
+      }
+      
+      updateData = {
+        client_tiktok: normalizedHandle,
+        tiktok_secuid: secUid
+      };
+    }
+    // Special handling for TikTok SecUID auto-sync
+    else if (selectedField.key === 'tiktok_secuid') {
+      const client = await findClientById(clientId);
+      const storedHandle = normalizeHandleValue(client?.client_tiktok || '');
+      
+      if (!storedHandle) {
+        return {
+          success: false,
+          message: `⚠️ Username TikTok belum diisi. Update *client_tiktok* terlebih dahulu.`
+        };
+      }
+      
+      const username = storedHandle.replace(/^@/, '');
+      let secUid = null;
+      
+      try {
+        const profile = await fetchTiktokProfile(username);
+        secUid = profile?.secUid || null;
+        if (secUid) {
+          additionalInfo = `\n✅ SecUID berhasil disinkronkan dari username: @${username}`;
+        } else {
+          additionalInfo = `\n❌ Gagal mengambil SecUID dari RapidAPI.`;
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `❌ Gagal mengambil SecUID: ${error.message}`
+        };
+      }
+      
+      updateData = { tiktok_secuid: secUid };
+    }
+    // Handle boolean fields
+    else if (selectedField.key.includes('status')) {
+      const lowerValue = trimmedValue.toLowerCase();
+      if (lowerValue !== 'true' && lowerValue !== 'false') {
+        return {
+          success: false,
+          message: `❌ Nilai tidak valid untuk field status. Masukkan *true* atau *false*.`
+        };
+      }
+      updateData = { [selectedField.key]: lowerValue === 'true' };
+    }
+    // Handle Instagram username
+    else if (selectedField.key === 'client_insta') {
+      const normalizedHandle = normalizeHandleValue(trimmedValue);
+      updateData = { [selectedField.key]: normalizedHandle };
+    }
+    // Handle other fields
+    else {
+      updateData = { [selectedField.key]: trimmedValue };
+    }
+    
+    // Perform the update
+    const updatedClient = await updateClient(clientId, updateData);
+    
+    if (!updatedClient) {
+      return {
+        success: false,
+        message: `❌ Client tidak ditemukan atau update gagal.`
+      };
+    }
+    
+    // Format success message
+    let msg = `✅ *Update Berhasil*\n\n`;
+    msg += `Field *${selectedField.label}* telah diperbarui.${additionalInfo}\n\n`;
+    msg += `📊 *Informasi Client*:\n`;
+    msg += `🆔 Client ID: ${updatedClient.client_id}\n`;
+    msg += `📛 Nama: ${updatedClient.nama || '-'}\n`;
+    msg += `📍 Status: ${updatedClient.client_status ? '✅ Aktif' : '❌ Tidak Aktif'}\n`;
+    msg += `🏷️ Tipe: ${updatedClient.client_type || '-'}\n`;
+    
+    return {
+      success: true,
+      message: msg
+    };
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error updating client:', error);
+    return {
+      success: false,
+      message: `❌ Terjadi kesalahan saat update: ${error.message}`
+    };
+  }
+}
+
+/**
  * Handle submenu actions for Management Menu (menu 2)
  * @param {string} submenu - Submenu number (1-5)
  * @param {string} subaction - Optional sub-action within submenu
@@ -299,7 +593,7 @@ async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel
       }
       switch (subaction) {
         case "1": // Update Data Client
-          return `ℹ️ *Update Data Client*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+          return handleUpdateClientStart(clientId, clientLabel);
         case "2": // Hapus Client
           return `⚠️ *Hapus Client*\n\nPenghapusan client adalah operasi berbahaya yang memerlukan konfirmasi admin.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
         case "3": // Info Client
@@ -385,7 +679,11 @@ export const clientRequestTelegramHandlers = {
   handleClientInfo,
   handleHapusWAUserPrompt,
   handleBulkStatusPrompt,
-  handleRefreshAggregator
+  handleRefreshAggregator,
+  handleUpdateClientStart,
+  handleUpdateClientGroupSelection,
+  handleUpdateClientFieldSelection,
+  handleUpdateClientValueInput
 };
 
 export default clientRequestTelegramHandlers;
