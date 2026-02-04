@@ -127,6 +127,40 @@ export const findAllActiveDirektorat = async () => {
   return res.rows;
 };
 
+// Ambil semua client ORG yang tidak aktif
+export const findAllInactiveOrgClients = async () => {
+  const selectColumns = await buildClientSelect([
+    "client_id",
+    "nama",
+    "client_type",
+    "client_status",
+    "client_group",
+  ]);
+  const res = await query(
+    `SELECT ${selectColumns}
+     FROM clients
+     WHERE client_status = false
+       AND LOWER(client_type) = LOWER('org')
+     ORDER BY client_id`
+  );
+  return res.rows;
+};
+
+// Ambil semua client Direktorat yang tidak aktif
+export const findAllInactiveDirektorat = async () => {
+  const selectColumns = await buildClientSelect(
+    ["client_id", "nama", "client_type", "client_status", "regional_id", "client_level"],
+    { includeParentClientId: true }
+  );
+  const res = await query(
+    `SELECT ${selectColumns}
+     FROM clients
+     WHERE client_status = false AND LOWER(client_type) = LOWER('direktorat')
+     ORDER BY client_id`
+  );
+  return res.rows;
+};
+
 export const findAllActiveDirektoratWithSosmed = async () => {
   const selectColumns = await buildClientSelect(
     [

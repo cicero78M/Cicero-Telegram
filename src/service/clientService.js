@@ -20,6 +20,12 @@ export const findAllActiveDirektoratClients = async () =>
 export const findAllActiveOrgClients = async () =>
   await clientModel.findAllActiveOrgClients();
 
+export const findAllInactiveOrgClients = async () =>
+  await clientModel.findAllInactiveOrgClients();
+
+export const findAllInactiveDirektoratClients = async () =>
+  await clientModel.findAllInactiveDirektorat();
+
 export const findAllClientsByType = async (clientType) =>
   await clientModel.findAllByType(clientType);
 
