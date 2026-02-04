@@ -28,6 +28,8 @@ const ITEMS_PER_PAGE = 10;
 // Minimum threshold for using space as split point when chunking messages (0.8 = 80%)
 // This ensures we don't split too far back from the maximum length, keeping chunks reasonably sized
 const MIN_SPACE_THRESHOLD = 0.8;
+// Visual separator for message sections
+const MESSAGE_SEPARATOR = '━━━━━━━━━━━━━━━━━━━━━━';
 
 /**
  * Initialize the Telegram Client Bot
@@ -874,7 +876,7 @@ async function handleInactiveClientSelection(chatId, text, from) {
     }
     
     detailsMessage += `\n*Catatan:* Client ini tidak aktif dan tidak dapat digunakan untuk operasi.\n\n`;
-    detailsMessage += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    detailsMessage += `${MESSAGE_SEPARATOR}\n\n`;
     detailsMessage += `*Opsi Pengelolaan:*\n`;
     detailsMessage += `Ketik *AKTIFKAN* untuk mengaktifkan client ini\n`;
     detailsMessage += `Ketik *KEMBALI* untuk kembali ke daftar\n`;
@@ -909,6 +911,7 @@ async function handleInactiveClientSelection(chatId, text, from) {
 
 /**
  * Handle status change confirmation for inactive client
+ * Supports bilingual commands (Indonesian/English) to accommodate various user preferences
  * @param {number} chatId - Telegram chat ID
  * @param {string} text - User input text
  * @param {object} from - Telegram user info

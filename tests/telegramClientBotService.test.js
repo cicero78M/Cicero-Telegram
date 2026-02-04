@@ -549,6 +549,8 @@ describe('Telegram Client Bot Service - Error Handling', () => {
             expect(message).toContain('Tidak Aktif');
             expect(message).toContain('AKTIFKAN');
             expect(message).toContain('Opsi Pengelolaan');
+            expect(message).toContain('KEMBALI');
+            expect(message).toContain('/menu');
           }
         }
       }
