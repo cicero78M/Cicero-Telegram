@@ -29,12 +29,14 @@ const mockFindAllActiveDirektoratClients = jest.fn();
 const mockFindAllActiveOrgClients = jest.fn();
 const mockFindAllInactiveOrgClients = jest.fn();
 const mockFindAllInactiveDirektoratClients = jest.fn();
+const mockFindAllInactiveClients = jest.fn();
 jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllActiveClients: mockFindAllActiveClients,
   findAllActiveDirektoratClients: mockFindAllActiveDirektoratClients,
   findAllActiveOrgClients: mockFindAllActiveOrgClients,
   findAllInactiveOrgClients: mockFindAllInactiveOrgClients,
   findAllInactiveDirektoratClients: mockFindAllInactiveDirektoratClients,
+  findAllInactiveClients: mockFindAllInactiveClients,
 }));
 
 // Mock telegramBotHelpers

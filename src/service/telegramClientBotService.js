@@ -9,7 +9,8 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { runClientRequestAction } from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
-  findAllActiveClients
+  findAllActiveClients,
+  findAllInactiveClients
 } from './clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
@@ -188,6 +189,12 @@ function setupMessageHandlers() {
       return;
     }
     
+    // Check if user is in inactive client selection mode
+    if (session && session.step === 'choose_inactive_client') {
+      await handleInactiveClientSelection(chatId, text, msg.from);
+      return;
+    }
+    
     // Check if it's a menu number
     if (text && /^\d+$/.test(text.trim())) {
       await handleMenuSelection(chatId, text.trim(), msg.from);
@@ -240,6 +247,9 @@ async function sendMainMenu(chatId) {
     
     '6️⃣ *Pilih/Ganti Client*\n' +
     '   Pilih atau ganti client aktif\n\n' +
+    
+    '7️⃣ *Kelola Client Tidak Aktif*\n' +
+    '   Lihat dan kelola client yang tidak aktif\n\n' +
     
     'Ketik nomor menu untuk mengaksesnya.';
   
@@ -586,6 +596,303 @@ async function handleClientSelection(chatId, text, from) {
 }
 
 /**
+ * Show inactive client selection menu to the user
+ * Displays all inactive clients for management purposes
+ * @param {number} chatId - Telegram chat ID
+ * @param {number} page - Optional page number for pagination (default: 1)
+ */
+async function showInactiveClientSelection(chatId, page = 1) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in showInactiveClientSelection');
+    return;
+  }
+  
+  try {
+    console.log(`[Telegram Client Bot] Fetching all inactive clients for chat:`, chatId);
+    
+    // Fetch all inactive clients
+    const clients = await findAllInactiveClients();
+    
+    // Validate clients response
+    if (!clients) {
+      console.error('[Telegram Client Bot] Query returned null or undefined for inactive clients');
+      await clientBot.sendMessage(chatId, `⚠️ Tidak dapat memuat daftar client tidak aktif.\n\nSilakan coba lagi atau ketik /menu untuk kembali ke menu utama.`);
+      return;
+    }
+    
+    if (!Array.isArray(clients)) {
+      console.error('[Telegram Client Bot] Query returned non-array for inactive clients:', typeof clients);
+      await clientBot.sendMessage(chatId, `⚠️ Data client tidak valid.\n\nSilakan coba lagi atau ketik /menu untuk kembali ke menu utama.`);
+      return;
+    }
+    
+    console.log(`[Telegram Client Bot] Found ${clients.length} inactive clients`);
+    
+    if (clients.length === 0) {
+      // No inactive clients found
+      console.log('[Telegram Client Bot] No inactive clients found');
+      await clientBot.sendMessage(chatId, `✅ Tidak ada client yang tidak aktif.\n\nSemua client dalam sistem berstatus aktif.\n\nKetik /menu untuk kembali ke menu utama.`);
+      return;
+    }
+    
+    // Validate client objects have required fields
+    const validClients = clients.filter(client => {
+      if (!isValidClient(client)) {
+        console.warn('[Telegram Client Bot] Invalid inactive client object found:', client);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validClients.length === 0) {
+      console.error('[Telegram Client Bot] All inactive clients are invalid');
+      await clientBot.sendMessage(chatId, `⚠️ Data client tidak valid.\n\nSilakan coba lagi atau ketik /menu untuk kembali ke menu utama.`);
+      return;
+    }
+    
+    if (validClients.length < clients.length) {
+      console.warn(`[Telegram Client Bot] Filtered out ${clients.length - validClients.length} invalid inactive clients`);
+    }
+    
+    // Pagination logic using page parameter
+    const totalPages = Math.ceil(validClients.length / ITEMS_PER_PAGE);
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, validClients.length);
+    const pageClients = validClients.slice(startIndex, endIndex);
+    
+    // Create inactive client selection menu
+    let clientMenu = `🔴 *Kelola Client Tidak Aktif*\n\n`;
+    clientMenu += 'Berikut adalah daftar client yang tidak aktif:\n\n';
+    
+    // Display inactive clients for current page with emoji numbers
+    pageClients.forEach((client, index) => {
+      const numberEmoji = NUMBER_EMOJIS[index];
+      const nama = escapeMarkdown(client.nama || client.client_id);
+      const clientId = escapeMarkdown(client.client_id);
+      const type = client.client_type ? escapeMarkdown(` [${client.client_type}]`) : '';
+      clientMenu += `${numberEmoji} ${clientId} - ${nama}${type} ⏸️\n`;
+    });
+    
+    // Add pagination information if there are multiple pages
+    if (totalPages > 1) {
+      clientMenu += `\n📄 Halaman ${page} dari ${totalPages} (Total: ${validClients.length} client tidak aktif)\n`;
+      clientMenu += '\nNavigasi:\n';
+      if (page > 1) {
+        clientMenu += '• Ketik *prev* atau *p* untuk halaman sebelumnya\n';
+      }
+      if (page < totalPages) {
+        clientMenu += '• Ketik *next* atau *n* untuk halaman berikutnya\n';
+      }
+      if (totalPages > 2) {
+        clientMenu += `• Ketik nomor halaman (1-${totalPages}) untuk langsung ke halaman tersebut\n`;
+      }
+    }
+    
+    clientMenu += '\n*Pilih Client untuk Melihat Detail:*\n';
+    clientMenu += `• Ketik angka emoji di atas (1-${pageClients.length})\n`;
+    clientMenu += '• Ketik Client ID lengkap untuk melihat detail\n';
+    clientMenu += '• Ketik *kembali* untuk kembali ke menu utama';
+    
+    // Store clients in session with pagination info
+    userSessions.set(chatId, {
+      step: 'choose_inactive_client',
+      clients: validClients,
+      currentPage: page,
+      totalPages: totalPages
+    });
+    
+    console.log('[Telegram Client Bot] Sending inactive client selection menu to chat:', chatId);
+    await clientBot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
+    console.log('[Telegram Client Bot] Inactive client selection menu sent successfully');
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error showing inactive client selection:', error);
+    console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    // Provide sanitized error message
+    let errorMessage = '❌ Terjadi kesalahan saat mengambil daftar client tidak aktif.\n\n';
+    
+    if (error.message) {
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Detail: Permintaan timeout.\n\n';
+      } else {
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
+    }
+    
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
+    if (clientBot) {
+      await clientBot.sendMessage(chatId, errorMessage);
+    }
+  }
+}
+
+/**
+ * Handle inactive client selection from user
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input (number or client ID)
+ * @param {object} from - Telegram user info
+ */
+async function handleInactiveClientSelection(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in handleInactiveClientSelection');
+    return;
+  }
+  
+  try {
+    console.log(`[Telegram Client Bot] Processing inactive client selection for chat ${chatId}, input: "${text}"`);
+    
+    const session = userSessions.get(chatId);
+    if (!session || !session.clients) {
+      console.warn('[Telegram Client Bot] Session not found or clients missing for chat:', chatId);
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak ditemukan. Silakan ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clients = session.clients;
+    
+    if (!Array.isArray(clients) || clients.length === 0) {
+      console.error('[Telegram Client Bot] Invalid or empty clients array in session');
+      await clientBot.sendMessage(chatId, '❌ Data client tidak valid. Silakan ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const input = text.trim();
+    const currentPage = session.currentPage || 1;
+    const totalPages = session.totalPages || 1;
+    
+    // Handle pagination commands
+    if (input.toLowerCase() === 'next' || input.toLowerCase() === 'n') {
+      if (currentPage < totalPages) {
+        await showInactiveClientSelection(chatId, currentPage + 1);
+      } else {
+        await clientBot.sendMessage(chatId, '❌ Sudah di halaman terakhir.');
+      }
+      return;
+    }
+    
+    if (input.toLowerCase() === 'prev' || input.toLowerCase() === 'p') {
+      if (currentPage > 1) {
+        await showInactiveClientSelection(chatId, currentPage - 1);
+      } else {
+        await clientBot.sendMessage(chatId, '❌ Sudah di halaman pertama.');
+      }
+      return;
+    }
+    
+    // Handle page number direct navigation
+    if (/^\d+$/.test(input) && totalPages > 1) {
+      const num = parseInt(input, 10);
+      if (num >= 1 && num <= totalPages) {
+        await showInactiveClientSelection(chatId, num);
+        return;
+      }
+    }
+    
+    // Handle "back" command
+    if (input.toLowerCase() === 'kembali' || input.toLowerCase() === 'back') {
+      console.log('[Telegram Client Bot] User wants to go back to main menu');
+      // Clear session and go back to main menu
+      userSessions.set(chatId, {
+        selectedClientId: DEFAULT_CLIENT_ID,
+        step: 'menu'
+      });
+      await sendMainMenu(chatId);
+      return;
+    }
+    
+    // Find selected client
+    let selectedClient = null;
+    
+    // Try numeric selection (1-10 for current page)
+    if (/^\d+$/.test(text)) {
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const pageClients = clients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      const index = parseInt(text, 10) - 1;
+      
+      if (index >= 0 && index < pageClients.length) {
+        selectedClient = pageClients[index];
+        console.log('[Telegram Client Bot] Client selected by number:', selectedClient.client_id);
+      }
+    }
+    
+    // Try direct client ID match if numeric selection didn't work
+    if (!selectedClient) {
+      selectedClient = clients.find(c => 
+        c.client_id.toUpperCase() === input.toUpperCase()
+      );
+      if (selectedClient) {
+        console.log('[Telegram Client Bot] Client selected by ID:', selectedClient.client_id);
+      }
+    }
+    
+    // If no client found, show error
+    if (!selectedClient) {
+      console.warn('[Telegram Client Bot] Client not found for input:', input);
+      await clientBot.sendMessage(
+        chatId,
+        `❌ Client tidak ditemukan.\n\nSilakan pilih nomor yang tertera atau ketik Client ID yang valid.\nKetik *kembali* untuk kembali ke menu utama.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    // Display inactive client details
+    const clientId = escapeMarkdown(selectedClient.client_id);
+    const nama = escapeMarkdown(selectedClient.nama || selectedClient.client_id);
+    const type = selectedClient.client_type ? escapeMarkdown(selectedClient.client_type) : 'N/A';
+    
+    let detailsMessage = `🔴 *Detail Client Tidak Aktif*\n\n`;
+    detailsMessage += `*Client ID:* ${clientId}\n`;
+    detailsMessage += `*Nama:* ${nama}\n`;
+    detailsMessage += `*Tipe:* ${type}\n`;
+    detailsMessage += `*Status:* Tidak Aktif ⏸️\n\n`;
+    
+    // Add additional info if available
+    if (selectedClient.client_group) {
+      detailsMessage += `*Group:* ${escapeMarkdown(selectedClient.client_group)}\n`;
+    }
+    if (selectedClient.regional_id) {
+      detailsMessage += `*Regional ID:* ${escapeMarkdown(selectedClient.regional_id)}\n`;
+    }
+    if (selectedClient.client_level !== undefined && selectedClient.client_level !== null) {
+      detailsMessage += `*Level:* ${selectedClient.client_level}\n`;
+    }
+    
+    detailsMessage += `\n*Catatan:* Client ini tidak aktif dan tidak dapat digunakan untuk operasi.\n\n`;
+    detailsMessage += `Untuk mengaktifkan kembali client ini, hubungi administrator sistem.\n\n`;
+    detailsMessage += `Ketik /menu untuk kembali ke menu utama atau pilih client lain.`;
+    
+    await clientBot.sendMessage(chatId, detailsMessage, { parse_mode: 'Markdown' });
+    
+    console.log('[Telegram Client Bot] Inactive client details sent for:', selectedClient.client_id);
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling inactive client selection:', error);
+    console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    let errorMessage = '❌ Terjadi kesalahan saat memproses pilihan client.\n\n';
+    
+    if (error.message) {
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('session')) {
+        errorMessage += 'Detail: Sesi tidak valid.\n\n';
+      } else {
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
+    }
+    
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
+    if (clientBot) {
+      await clientBot.sendMessage(chatId, errorMessage);
+    }
+  }
+}
+
+/**
  * Handle menu selection from user
  * @param {number} chatId - Telegram chat ID
  * @param {string} menuNumber - Menu number selected
@@ -604,6 +911,13 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     if (menuNumber === '6') {
       console.log('[Telegram Client Bot] User selected menu 6 - Choose/Change Client');
       await showClientSelection(chatId);
+      return;
+    }
+    
+    // Handle menu 7 (Manage Inactive Clients) - special case
+    if (menuNumber === '7') {
+      console.log('[Telegram Client Bot] User selected menu 7 - Manage Inactive Clients');
+      await showInactiveClientSelection(chatId);
       return;
     }
     
