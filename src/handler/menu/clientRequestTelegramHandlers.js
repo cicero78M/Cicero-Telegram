@@ -208,7 +208,9 @@ async function handleKelolaClientMenu(clientId, clientLabel) {
     `   Hapus client dari sistem\n\n` +
     `3️⃣ *Info Client*\n` +
     `   Tampilkan detail client\n\n` +
-    `Ketik nomor aksi (1-3) atau /menu untuk kembali.`;
+    `4️⃣ *Update Status Client*\n` +
+    `   Perbarui status Instagram, TikTok, dan Amplifikasi\n\n` +
+    `Ketik nomor aksi (1-4) atau /menu untuk kembali.`;
 }
 
 /**
@@ -402,6 +404,140 @@ async function processClientFieldUpdate(clientId, fieldNumber, newValue) {
 }
 
 /**
+ * Handle Update Status Client - Show status field selection menu (2.1.4)
+ * Returns menu for selecting which status field to update
+ */
+async function handleUpdateStatusClientMenu(clientId, clientLabel) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return `❌ Client dengan ID ${clientId} tidak ditemukan.`;
+    }
+
+    const instaStatus = client.client_insta_status ? '✅ Aktif' : '❌ Tidak Aktif';
+    const tiktokStatus = client.client_tiktok_status ? '✅ Aktif' : '❌ Tidak Aktif';
+    const amplifyStatus = client.client_amplify_status ? '✅ Aktif' : '❌ Tidak Aktif';
+
+    return `🔄 *Update Status Client*\n` +
+      `Client: ${clientLabel}\n\n` +
+      `Pilih status yang ingin diupdate:\n\n` +
+      `1️⃣ *Status Instagram*\n` +
+      `   Saat ini: ${instaStatus}\n\n` +
+      `2️⃣ *Status TikTok*\n` +
+      `   Saat ini: ${tiktokStatus}\n\n` +
+      `3️⃣ *Status Amplifikasi*\n` +
+      `   Saat ini: ${amplifyStatus}\n\n` +
+      `Ketik nomor status (1-3) atau /menu untuk kembali.`;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error in status field selection:', error);
+    return `❌ Gagal memuat data client: ${error.message}`;
+  }
+}
+
+/**
+ * Handle status field update prompt
+ * Returns prompt message asking for status update confirmation
+ */
+async function handleStatusFieldUpdatePrompt(clientId, statusFieldNumber, clientLabel) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return `❌ Client dengan ID ${clientId} tidak ditemukan.`;
+    }
+
+    const statusFieldNames = {
+      '1': { field: 'client_insta_status', label: 'Status Instagram', current: client.client_insta_status },
+      '2': { field: 'client_tiktok_status', label: 'Status TikTok', current: client.client_tiktok_status },
+      '3': { field: 'client_amplify_status', label: 'Status Amplifikasi', current: client.client_amplify_status }
+    };
+
+    const statusInfo = statusFieldNames[statusFieldNumber];
+    if (!statusInfo) {
+      return `❌ Status field tidak valid.`;
+    }
+
+    const currentStatus = statusInfo.current ? '✅ Aktif' : '❌ Tidak Aktif';
+    const newStatus = statusInfo.current ? '❌ Tidak Aktif' : '✅ Aktif';
+
+    return `🔄 *Update ${statusInfo.label}*\n` +
+      `Client: ${clientLabel}\n\n` +
+      `Status saat ini: ${currentStatus}\n` +
+      `Status baru: ${newStatus}\n\n` +
+      `Apakah Anda yakin ingin mengubah status ini?\n\n` +
+      `Ketik *YA* untuk konfirmasi atau *TIDAK* untuk membatalkan.`;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error getting status info:', error);
+    return `❌ Gagal mengambil informasi status: ${error.message}`;
+  }
+}
+
+/**
+ * Process status field update
+ * Toggles the specified status field
+ */
+async function processStatusFieldUpdate(clientId, statusFieldNumber) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return { success: false, message: `❌ Client dengan ID ${clientId} tidak ditemukan.` };
+    }
+
+    // Map status field numbers to database columns
+    const statusFieldMapping = {
+      '1': 'client_insta_status',
+      '2': 'client_tiktok_status',
+      '3': 'client_amplify_status'
+    };
+
+    const statusFieldName = statusFieldMapping[statusFieldNumber];
+    if (!statusFieldName) {
+      return { success: false, message: `❌ Status field tidak valid.` };
+    }
+
+    // Get current status and toggle it
+    const currentStatus = client[statusFieldName];
+    const newStatus = !currentStatus;
+
+    // Prepare update data
+    const updateData = { [statusFieldName]: newStatus };
+
+    // Perform the update
+    const updatedClient = await updateClient(clientId, updateData);
+    
+    if (!updatedClient) {
+      return { 
+        success: false, 
+        message: `❌ Gagal mengupdate status client. Client tidak ditemukan.` 
+      };
+    }
+
+    // Get field label for success message
+    const statusFieldLabels = {
+      'client_insta_status': 'Status Instagram',
+      'client_tiktok_status': 'Status TikTok',
+      'client_amplify_status': 'Status Amplifikasi'
+    };
+
+    const statusDisplay = newStatus ? '✅ Aktif' : '❌ Tidak Aktif';
+    
+    return { 
+      success: true, 
+      message: `✅ *Update Status Berhasil*\n\n` +
+        `Client: ${client.nama || clientId}\n` +
+        `Field: ${statusFieldLabels[statusFieldName]}\n` +
+        `Status baru: ${statusDisplay}\n\n` +
+        `Status client telah diperbarui.`
+    };
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error updating status:', error);
+    return { 
+      success: false, 
+      message: `❌ Terjadi kesalahan saat mengupdate status: ${error.message}` 
+    };
+  }
+}
+
+/**
  * Handle Kelola User submenu (2.2)
  */
 async function handleKelolaUserMenu(clientId, clientLabel) {
@@ -472,8 +608,10 @@ async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel
           return `⚠️ *Hapus Client*\n\nPenghapusan client adalah operasi berbahaya yang memerlukan konfirmasi admin.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
         case "3": // Info Client
           return handleClientInfo(clientId);
+        case "4": // Update Status Client
+          return handleUpdateStatusClientMenu(clientId, clientLabel);
         default:
-          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-3).`;
+          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-4).`;
       }
     
     case "2": // Kelola User
@@ -556,7 +694,10 @@ export const clientRequestTelegramHandlers = {
   handleRefreshAggregator,
   handleUpdateClientFieldSelection,
   handleClientFieldUpdatePrompt,
-  processClientFieldUpdate
+  processClientFieldUpdate,
+  handleUpdateStatusClientMenu,
+  handleStatusFieldUpdatePrompt,
+  processStatusFieldUpdate
 };
 
 // Export constants
