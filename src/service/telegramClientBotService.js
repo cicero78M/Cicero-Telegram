@@ -255,7 +255,7 @@ function setupMessageHandlers() {
     
     // Check if user is confirming status field update
     if (session && session.step === 'update_status_field_confirmation') {
-      await handleUpdateStatusFieldConfirmation(chatId, text, msg.from);
+      await handleUpdateStatusFieldConfirmation(chatId, text.trim().toUpperCase(), msg.from);
       return;
     }
     
@@ -1555,7 +1555,7 @@ async function handleUpdateStatusFieldSelection(chatId, statusFieldNumber, from)
     const clientName = session.clientName || clientId;
     
     // Validate status field number
-    if (!['1', '2', '3'].includes(statusFieldNumber.trim())) {
+    if (!['1', '2', '3'].includes(statusFieldNumber)) {
       await clientBot.sendMessage(
         chatId,
         `❌ Pilihan tidak valid. Ketik nomor status yang valid (1-3) atau /menu untuk kembali.`
@@ -1595,7 +1595,7 @@ async function handleUpdateStatusFieldSelection(chatId, statusFieldNumber, from)
 /**
  * Handle status field update confirmation
  * @param {number} chatId - Telegram chat ID
- * @param {string} confirmation - User confirmation (YA/TIDAK)
+ * @param {string} confirmation - User confirmation (already trimmed and uppercased)
  * @param {object} from - User info from Telegram
  */
 async function handleUpdateStatusFieldConfirmation(chatId, confirmation, from) {
@@ -1613,10 +1613,9 @@ async function handleUpdateStatusFieldConfirmation(chatId, confirmation, from) {
     
     const clientId = session.selectedClientId;
     const statusFieldNumber = session.selectedStatusField;
-    const input = confirmation.trim().toUpperCase();
     
     // Check for cancellation
-    if (input === 'TIDAK' || input === 'NO') {
+    if (confirmation === 'TIDAK' || confirmation === 'NO') {
       console.log(`[Telegram Client Bot] Status update cancelled by user for client ${clientId}`);
       
       // Reset session to menu mode
@@ -1634,7 +1633,7 @@ async function handleUpdateStatusFieldConfirmation(chatId, confirmation, from) {
     }
     
     // Check for confirmation
-    if (input !== 'YA' && input !== 'YES') {
+    if (confirmation !== 'YA' && confirmation !== 'YES') {
       await clientBot.sendMessage(
         chatId,
         '❌ Konfirmasi tidak valid. Ketik *YA* untuk konfirmasi atau *TIDAK* untuk membatalkan.',
