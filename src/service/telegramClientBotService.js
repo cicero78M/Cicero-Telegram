@@ -9,7 +9,8 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { 
   runClientRequestAction,
-  clientRequestTelegramHandlers
+  clientRequestTelegramHandlers,
+  NUM_UPDATABLE_FIELDS
 } from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
   findAllActiveClients,
@@ -1369,10 +1370,11 @@ async function handleUpdateClientFieldSelection(chatId, fieldNumber, from) {
     const clientName = session.clientName || clientId;
     
     // Validate field number
-    if (!/^[1-6]$/.test(fieldNumber.trim())) {
+    const fieldRegex = new RegExp(`^[1-${NUM_UPDATABLE_FIELDS}]$`);
+    if (!fieldRegex.test(fieldNumber.trim())) {
       await clientBot.sendMessage(
         chatId,
-        '❌ Pilihan tidak valid. Ketik nomor field yang valid (1-6) atau /menu untuk kembali.'
+        `❌ Pilihan tidak valid. Ketik nomor field yang valid (1-${NUM_UPDATABLE_FIELDS}) atau /menu untuk kembali.`
       );
       return;
     }

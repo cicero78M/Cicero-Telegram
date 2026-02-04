@@ -25,6 +25,17 @@ jest.unstable_mockModule('../../../src/service/aggregatorService.js', () => ({
 jest.unstable_mockModule('../../../src/utils/utilsHelper.js', () => ({
   getGreeting: jest.fn(() => 'Selamat Pagi'),
   formatNama: jest.fn((name) => name),
+  normalizeWhatsAppNumber: jest.fn((value) => {
+    if (!value || value.trim() === '') return '';
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly.startsWith('0')) {
+      return '62' + digitsOnly.slice(1);
+    } else if (!digitsOnly.startsWith('62')) {
+      return '62' + digitsOnly;
+    } else {
+      return digitsOnly;
+    }
+  }),
 }));
 
 // Import the module under test after mocking
@@ -79,7 +90,7 @@ describe('clientRequestTelegramHandlers - Update Client', () => {
       expect(result).toContain('tidak ditemukan');
     });
 
-    it('should show empty fields with dash', async () => {
+    it('should display dash for empty or null field values', async () => {
       const mockClient = {
         client_id: 'TEST_CLIENT',
         nama: 'Test Client',

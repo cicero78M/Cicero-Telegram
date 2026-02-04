@@ -11,7 +11,7 @@ import {
   getClientSummary,
   updateClient
 } from "../../service/clientService.js";
-import { getGreeting, formatNama } from "../../utils/utilsHelper.js";
+import { getGreeting, formatNama, normalizeWhatsAppNumber } from "../../utils/utilsHelper.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";
 
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
@@ -20,6 +20,19 @@ const DITBINMAS_CLIENT_ID = "DITBINMAS";
 const FEATURE_IN_DEVELOPMENT_MSG = 
   `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
   `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
+
+// Updatable client fields configuration
+const UPDATABLE_CLIENT_FIELDS = {
+  '1': { field: 'nama', label: 'Nama Client' },
+  '2': { field: 'client_insta', label: 'Instagram Username' },
+  '3': { field: 'client_tiktok', label: 'TikTok Username' },
+  '4': { field: 'client_group', label: 'Client Group' },
+  '5': { field: 'client_operator', label: 'Client Operator' },
+  '6': { field: 'client_super', label: 'Client Super Admin' }
+};
+
+// Number of updatable fields
+const NUM_UPDATABLE_FIELDS = Object.keys(UPDATABLE_CLIENT_FIELDS).length;
 
 /**
  * Format client label for display
@@ -260,7 +273,7 @@ async function handleUpdateClientFieldSelection(clientId, clientLabel) {
       `   Saat ini: ${client.client_operator || '-'}\n\n` +
       `6️⃣ *Client Super Admin (WA)*\n` +
       `   Saat ini: ${client.client_super || '-'}\n\n` +
-      `Ketik nomor field (1-6) atau /menu untuk kembali.`;
+      `Ketik nomor field (1-${NUM_UPDATABLE_FIELDS}) atau /menu untuk kembali.`;
   } catch (error) {
     console.error('[ClientRequestTelegram] Error in field selection:', error);
     return `❌ Gagal memuat data client: ${error.message}`;
@@ -291,7 +304,7 @@ function handleClientFieldUpdatePrompt(fieldNumber, clientLabel, currentValue) {
     `Nilai saat ini: ${currentValue || '-'}\n\n` +
     `Masukkan nilai baru untuk ${fieldInfo.label}:\n` +
     `${fieldInfo.hint}\n\n` +
-    `Ketik /menu untuk membatalkan.`;
+    `Ketik nomor field (1-${NUM_UPDATABLE_FIELDS}) atau /menu untuk membatalkan.`;
 }
 
 /**
@@ -341,14 +354,8 @@ async function processClientFieldUpdate(clientId, fieldNumber, newValue) {
             message: `❌ Format nomor WhatsApp tidak valid. Nomor harus 10-15 digit.` 
           };
         }
-        // Normalize to start with 62
-        if (digitsOnly.startsWith('0')) {
-          updateValue = '62' + digitsOnly.slice(1);
-        } else if (!digitsOnly.startsWith('62')) {
-          updateValue = '62' + digitsOnly;
-        } else {
-          updateValue = digitsOnly;
-        }
+        // Use helper to normalize
+        updateValue = normalizeWhatsAppNumber(updateValue);
       }
     }
 
@@ -551,5 +558,8 @@ export const clientRequestTelegramHandlers = {
   handleClientFieldUpdatePrompt,
   processClientFieldUpdate
 };
+
+// Export constants
+export { NUM_UPDATABLE_FIELDS, UPDATABLE_CLIENT_FIELDS };
 
 export default clientRequestTelegramHandlers;
