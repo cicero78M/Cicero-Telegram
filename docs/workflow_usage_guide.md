@@ -24,9 +24,9 @@ Hot reload hanya memantau kode (`app.js` dan folder `src`). Folder data seperti 
 ## 3. Alur Pekerjaan Backend
 
 1. **Autentikasi** – Endpoint `/api/auth/login` memberikan JWT. Token dipakai pada seluruh request berikutnya.
-2. **Pengambilan Data** – Cron harian di `src/cron` mengambil postingan Instagram/TikTok, menyimpan like & komentar, lalu menganalisis hashtag.
+2. **Pengambilan Data** – Scheduled jobs mengambil postingan Instagram/TikTok, menyimpan like & komentar, lalu menganalisis hashtag.
 3. **Penyimpanan** – Data tersimpan di tabel PostgreSQL seperti `insta_post`, `insta_like`, `tiktok_post`, dll. Struktur lengkap ada di `docs/database_structure.md`.
-4. **Notifikasi** – Modul `waService.js` mengirim laporan harian dan pengingat via WhatsApp sesuai jadwal pada `docs/activity_schedule.md`.
+4. **Notifikasi** – Service layer mengirim laporan harian dan pengingat via WhatsApp sesuai jadwal pada `docs/activity_schedule.md`.
 5. **Antrian (opsional)** – Tugas berat dapat dikirim ke RabbitMQ melalui `publishToQueue` di `src/service/rabbitMQService.js`.
 
 ## 4. Fitur WhatsApp Bot

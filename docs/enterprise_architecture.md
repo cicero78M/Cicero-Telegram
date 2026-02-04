@@ -19,15 +19,14 @@ This document provides a high level overview of the architecture behind Cicero W
 
 The backend exposes REST endpoints to manage clients, users, and social media analytics. Key modules include:
 
-- `app.js` – Express entry point registering middleware, routes, and scheduled cron buckets based on WhatsApp readiness.
-- `src/controller` – Controller layer for clients, users, OAuth callbacks, dashboard metrics, editorial events, aggregator feeds, premium flows, and social media endpoints.
-- `src/service` – Cron helpers, API wrappers, WhatsApp helpers, OTP/email delivery, Google contact sync, RabbitMQ queues, and various utility functions.
-- `src/handler` – WhatsApp menu logic, link amplification processors, and fetch helpers for automation.
-- `src/routes` – API routes for auth, clients, users, Instagram/TikTok, logs, metadata, dashboards, aggregator widgets, Penmas editorial workflows, OTP claim flows, premium requests, and link amplification.
-- `src/middleware` – Authentication (JWT, dashboard, Penmas), request deduplication, debugging, and global error handling.
-- `src/repository` – Database helper queries.
-- `src/model` – Database models for clients, users, social media posts, metrics, and visitor logs.
-- `src/config` – Environment management (`env.js`) and Redis connection (`redis.js`).
+- `app.js` – Application entry point initializing 4 Telegram bots (Direktorat, Operator, User, Client) with conditional activation.
+- `src/service` – Business services (75+) including Telegram bot services, API wrappers, OTP/email delivery, Google contact sync, RabbitMQ queues, and various utility functions.
+- `src/handler` – Business logic handlers including Telegram bot menu handlers (dirRequest, oprRequest, userMenu, clientRequest), social media fetching, engagement tracking, and data mining operations.
+- `src/model` – Database models (34+) for clients, users, social media posts (Instagram/TikTok), metrics, subscriptions, editorial events, and audit logs.
+- `src/middleware` – Request processing middleware including debug logging and request deduplication.
+- `src/repository` – Database query abstraction layer.
+- `src/config` – Environment management (`env.js`), Redis connection (`redis.js`), and premium tier configuration.
+- `src/utils` – Utility functions (20+) including logger, encryption, Telegram helpers, Excel generation, and more.
 
 ### Frontend (`cicero-dashboard`)
 

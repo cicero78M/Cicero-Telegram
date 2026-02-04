@@ -163,9 +163,9 @@ Three authenticated endpoints are exposed under the client routes namespace:
 - `PUT /api/client/:client_id/satbinmas-official` upserts an account. The body
   accepts `{ platform, username, display_name?, profile_url?, secUid?, is_active?, is_verified? }`.
 - `DELETE /api/client/:client_id/satbinmas-official/:account_id` removes a
-  handle linked to the client.【F:src/controller/clientController.js†L7-L105】【F:src/routes/clientRoutes.js†L1-L36】
+  handle linked to the client.
 
-Each controller method wraps service errors and returns either the row data or a
+Each method wraps service errors and returns either the row data or a
 JSON error payload with the appropriate HTTP status code. Successful upserts use
 HTTP `201 Created` when a new row is inserted so API consumers can react to the
 change.

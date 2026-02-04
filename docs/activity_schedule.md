@@ -1,29 +1,33 @@
 # System Activity Schedule
-*Last updated: 2026-01-28*
+*Last updated: 2026-02-04*
 
-This document summarizes the automated jobs ("activity") that run inside Cicero_V2. All jobs use `node-cron`, are registered from `src/cron/*.js` during `app.js` boot, and execute in the **Asia/Jakarta** timezone unless stated otherwise. Base jobs still come from the manifest in `src/cron/cronManifest.js`, while Ditbinmas (dirRequest) jobs are grouped in `src/cron/dirRequest/index.js` so they can be toggled together when needed.【F:src/cron/dirRequest/index.js†L1-L108】
+**Note**: This repository does NOT have a `/src/cron/` directory in the current version. The cron jobs referenced in this document are either:
+- Managed by external system cron
+- Handled by PM2 ecosystem configuration  
+- Implemented as periodic checks within services
+- Part of an older architecture that has been refactored
+
+This document is maintained for reference purposes to understand the scheduled tasks that should be running in the system.
+
+---
+
+This document summarizes the automated jobs ("activity") that run inside Cicero_V2. All jobs use `node-cron` and execute in the **Asia/Jakarta** timezone unless stated otherwise.
 
 ## Runtime safeguards & configuration sync
 
-Every cron file calls `scheduleCronJob`, which delegates to `src/utils/cronScheduler.js`. Before executing a handler, the scheduler fetches the matching record in `cron_job_config`; the job runs only when `is_active=true` so operations can toggle tasks safely without redeploying. The scheduler now retries the lookup once and logs errors before falling back to running the handler if configuration is unavailable, while still honoring `is_active=false` whenever the lookup succeeds. During prolonged database outages, disabled jobs may temporarily run because the safety check cannot be read—monitor `[CRON] Failed to check status...` logs to spot this scenario. The dirRequest group adds a higher-level toggle through `ENABLE_DIRREQUEST_GROUP` to pause all Ditbinmas schedules at once.【F:src/utils/cronScheduler.js†L1-L73】【F:src/cron/dirRequest/index.js†L1-L92】
+The scheduler uses `src/utils/cronScheduler.js` to fetch the matching record in `cron_job_config`; jobs run only when `is_active=true` so operations can toggle tasks safely without redeploying. During prolonged database outages, disabled jobs may temporarily run because the safety check cannot be read—monitor `[CRON] Failed to check status...` logs to spot this scenario. The dirRequest group adds a higher-level toggle through `ENABLE_DIRREQUEST_GROUP` to pause all Ditbinmas schedules at once.
 
-The configuration data lives in the migration `sql/migrations/20251022_create_cron_job_config.sql` and is surfaced in the cron configuration menu, keeping this schedule synchronized with the controls that ops staff use to enable or pause jobs.【F:sql/migrations/20251022_create_cron_job_config.sql†L1-L34】
+The configuration data lives in the migration `sql/migrations/20251022_create_cron_job_config.sql` and is surfaced in the cron configuration menu, keeping this schedule synchronized with the controls that ops staff use to enable or pause jobs.
 
-dirRequest cron registration happens immediately at boot (subject to `ENABLE_DIRREQUEST_GROUP`). Every dirRequest job key is single-flight: if a previous run is still in-flight, the next scheduled run logs a skip message and exits early to prevent overlap.【F:src/cron/dirRequest/index.js†L1-L108】
+dirRequest cron registration happens at system boot (subject to `ENABLE_DIRREQUEST_GROUP`). Every dirRequest job key is single-flight: if a previous run is still in-flight, the next scheduled run logs a skip message and exits early to prevent overlap.
 
 ## Cron Jobs
 
-Use the helper script below to regenerate the manifest-driven table so that schedules stay aligned with the manifest and source files:
+**Note**: The cron job files referenced below are part of the scheduled task system. The actual implementation may vary depending on deployment configuration.
 
-```bash
-node docs/scripts/renderCronSchedule.js > /tmp/cron-jobs.md
-```
+### Core cron jobs
 
-Then paste the output into this section. The table is sourced from `src/cron/cronManifest.js` and each module's `scheduleCronJob` call.
-
-### Core cron jobs (manifest-driven)
-
-| File | Schedule (Asia/Jakarta) | Description |
+| Job Name | Schedule (Asia/Jakarta) | Description |
 |------|-------------------------|-------------|
 | `cronDbBackup.js` | `0 4 * * *` | Backup database dump to Google Drive using service account credentials. |
 | `cronRekapLink.js` | `5 15,18,21 * * *` | Distribute amplification link recaps to all active amplification clients. |
@@ -38,16 +42,16 @@ Then paste the output into this section. The table is sourced from `src/cron/cro
 | `cronPremiumExpiry.js` | `0 0 * * *` | Expire mobile premium users when `premium_end_date` is in the past. |
 | `cronDashboardPremiumRequestExpiry.js` | `0 * * * *` | Expire pending/confirmed dashboard premium requests after their `expired_at` deadline and send requester/admin WhatsApp notifications. |
 
-### Ditbinmas dirRequest group (registered via `registerDirRequestCrons`)
+### Ditbinmas dirRequest group
 
-The schedules below are bundled inside `src/cron/dirRequest/index.js` and register immediately during boot. Set `ENABLE_DIRREQUEST_GROUP=false` in the environment to pause all of them together without editing each job record. The table order mirrors the serialized registration chain, and the cron expressions are staggered to avoid overlapping WhatsApp sends in the Asia/Jakarta timezone.【F:src/cron/dirRequest/index.js†L1-L108】
+The schedules below are part of the dirRequest group and can be toggled together using the `ENABLE_DIRREQUEST_GROUP` environment variable. The cron expressions are staggered to avoid overlapping WhatsApp sends in the Asia/Jakarta timezone.
 
-| File | Schedule (Asia/Jakarta) | Description |
+| Job Name | Schedule (Asia/Jakarta) | Description |
 |------|-------------------------|-------------|
-| `cronWaNotificationReminder.js` | `10 16 * * *<br>40 16 * * *<br>10 17 * * *<br>40 17 * * *` | Send WhatsApp task reminders to Ditbinmas and BIDHUMAS users who opted in, spacing each WhatsApp delivery by 3 seconds and persisting each recipient's last stage/completion in `wa_notification_reminder_state` so completed users are skipped on reruns while pending users continue their follow-up stage. |
+| `cronWaNotificationReminder.js` | `10 16 * * *<br>40 16 * * *<br>10 17 * * *<br>40 17 * * *` | Send WhatsApp task reminders to Ditbinmas and BIDHUMAS users who opted in. |
 | `cronDirRequestSatbinmasOfficialMedia.js` | `5 23 * * *` | Share Satbinmas official media updates with Ditbinmas recipients. |
-| `cronDirRequestDitbinmasGroupRecap.js` | `10 15 * * *<br>14 18 * * *` | Send Ditbinmas group-only recap by running dirRequest menus 21 and 22 with the "hari ini" engagement period. |
-| `cronDirRequestDitbinmasSuperAdminDaily.js` | `10 18 * * *` | Send Ditbinmas super admin-only recaps by running dirRequest menus 6, 9, 34, and 35 with the "hari ini" engagement period. |
+| `cronDirRequestDitbinmasGroupRecap.js` | `10 15 * * *<br>14 18 * * *` | Send Ditbinmas group-only recap (dirRequest menus 21 and 22). |
+| `cronDirRequestDitbinmasSuperAdminDaily.js` | `10 18 * * *` | Send Ditbinmas super admin-only recaps (dirRequest menus 6, 9, 34, and 35). |
 | `cronDirRequestDitbinmasOperatorDaily.js` | `12 18 * * *` | Send Ditbinmas operator-only reports by running dirRequest menu 30 with the "hari ini" period. |
 | `cronDirRequestBidhumasEvening.js` | `30 20 * * *<br>0 22 * * *` | Send dirRequest menus 6, 9, 28, and 29 exclusively to the BIDHUMAS group and its super admin recipients at exactly 22:00 WIB (no fetch post/engagement step). |
 
