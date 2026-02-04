@@ -190,6 +190,8 @@ describe('Telegram Client Bot Service - Error Handling', () => {
         { client_id: null, nama: 'Invalid Client' },
         { client_id: 'CLIENT1', nama: 'Valid Client One' },
         { nama: 'No ID Client' },
+        { client_id: '', nama: 'Empty ID Client' },
+        { client_id: '   ', nama: 'Whitespace ID Client' },
         { client_id: 'CLIENT2', nama: 'Valid Client Two' },
       ]);
 
@@ -212,6 +214,14 @@ describe('Telegram Client Bot Service - Error Handling', () => {
         const messages = calls.map(call => call[1]);
         const hasClientMenu = messages.some(msg => msg.includes('CLIENT1') && msg.includes('CLIENT2'));
         expect(hasClientMenu).toBe(true);
+        // Should not include invalid entries
+        const hasInvalidEntries = messages.some(msg => 
+          msg.includes('Invalid Client') || 
+          msg.includes('No ID Client') || 
+          msg.includes('Empty ID Client') ||
+          msg.includes('Whitespace ID Client')
+        );
+        expect(hasInvalidEntries).toBe(false);
       }
     });
 

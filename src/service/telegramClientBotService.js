@@ -274,7 +274,7 @@ async function showClientSelection(chatId) {
     
     // Validate client objects have required fields
     const validClients = clients.filter(client => {
-      if (!client || !client.client_id) {
+      if (!client || !client.client_id || client.client_id.trim() === '') {
         console.warn('[Telegram Client Bot] Invalid client object found:', client);
         return false;
       }
@@ -327,11 +327,20 @@ async function showClientSelection(chatId) {
     console.error('[Telegram Client Bot] Error showing client selection:', error);
     console.error('[Telegram Client Bot] Error stack:', error.stack);
     
-    // Provide more detailed error information
+    // Provide sanitized error message to avoid leaking sensitive system information
     let errorMessage = '❌ Terjadi kesalahan saat mengambil daftar client.\n\n';
     
+    // Only include error type, not full details that might contain sensitive info
     if (error.message) {
-      errorMessage += `Detail: ${error.message}\n\n`;
+      // Check if error is database-related
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Detail: Permintaan timeout.\n\n';
+      } else {
+        // Generic error message without sensitive details
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
     }
     
     errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
@@ -408,8 +417,8 @@ async function handleClientSelection(chatId, text, from) {
     }
     
     // Validate selected client has required fields
-    if (!selectedClient.client_id) {
-      console.error('[Telegram Client Bot] Selected client missing client_id:', selectedClient);
+    if (!selectedClient.client_id || selectedClient.client_id.trim() === '') {
+      console.error('[Telegram Client Bot] Selected client missing or has invalid client_id:', selectedClient);
       await clientBot.sendMessage(
         chatId, 
         '❌ Data client tidak valid. Silakan ketik /menu untuk memulai kembali.'
@@ -441,8 +450,25 @@ async function handleClientSelection(chatId, text, from) {
   } catch (error) {
     console.error('[Telegram Client Bot] Error handling client selection:', error);
     console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    // Provide sanitized error message to avoid leaking sensitive system information
+    let errorMessage = '❌ Terjadi kesalahan saat memproses pilihan client.\n\n';
+    
+    // Only include error type, not full details that might contain sensitive info
+    if (error.message) {
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorMessage += 'Detail: Masalah koneksi database.\n\n';
+      } else if (error.message.includes('session')) {
+        errorMessage += 'Detail: Sesi tidak valid.\n\n';
+      } else {
+        errorMessage += 'Detail: Terjadi kesalahan sistem.\n\n';
+      }
+    }
+    
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
     if (clientBot) {
-      await clientBot.sendMessage(chatId, `❌ Terjadi kesalahan saat memproses pilihan client.\n\nDetail: ${error.message}\n\nSilakan coba lagi atau ketik /menu untuk memulai ulang.`);
+      await clientBot.sendMessage(chatId, errorMessage);
     }
   }
 }
