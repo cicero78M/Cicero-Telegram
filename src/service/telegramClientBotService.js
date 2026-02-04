@@ -361,9 +361,10 @@ async function showClientSelection(chatId, clientType = null) {
     // Display up to 10 clients with emoji numbers
     validClients.slice(0, 10).forEach((client, index) => {
       const numberEmoji = NUMBER_EMOJIS[index];
-      const nama = client.nama || client.client_id;
-      const type = client.client_type ? ` [${client.client_type}]` : '';
-      clientMenu += `${numberEmoji} ${client.client_id} - ${nama}${type}\n`;
+      const nama = escapeMarkdown(client.nama || client.client_id);
+      const clientId = escapeMarkdown(client.client_id);
+      const type = client.client_type ? ` [${escapeMarkdown(client.client_type)}]` : '';
+      clientMenu += `${numberEmoji} ${clientId} - ${nama}${type}\n`;
     });
     
     if (validClients.length > 10) {

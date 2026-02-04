@@ -25,8 +25,12 @@ jest.unstable_mockModule('../src/handler/menu/clientRequestTelegramHandlers.js',
 
 // Mock clientService
 const mockFindAllActiveClients = jest.fn();
+const mockFindAllActiveDirektoratClients = jest.fn();
+const mockFindAllActiveOrgClients = jest.fn();
 jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllActiveClients: mockFindAllActiveClients,
+  findAllActiveDirektoratClients: mockFindAllActiveDirektoratClients,
+  findAllActiveOrgClients: mockFindAllActiveOrgClients,
 }));
 
 // Mock telegramBotHelpers
@@ -286,6 +290,66 @@ describe('Telegram Client Bot Service - Error Handling', () => {
         const messages = calls.map(call => call[1]);
         const hasClientMenu = messages.some(msg => msg.includes('Pilih Client') || msg.includes('CLIENT1'));
         expect(hasClientMenu).toBe(true);
+      }
+    });
+
+    it('should escape special markdown characters in client names to prevent entity parsing errors', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock escapeMarkdown to track if it's called with the right values
+      mockEscapeMarkdown.mockImplementation((text) => {
+        if (!text || typeof text !== 'string') return text;
+        return text.replace(/[_*`\[\\]/g, '\\$&');
+      });
+      
+      // Mock client list with special characters that would cause Telegram entity parsing errors
+      mockFindAllActiveClients.mockResolvedValue([
+        { client_id: 'POLRES_BANDUNG', nama: 'POLRES BANDUNG*CITY', client_type: 'ORG' },
+        { client_id: 'DITBINMAS_[HQ]', nama: 'Direktorat `Special`', client_type: 'DIR' },
+      ]);
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 99999, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Find the client selection menu message
+        const calls = mockSendMessage.mock.calls.filter(call => call[0] === 99999);
+        expect(calls.length).toBeGreaterThan(0);
+        
+        // Find the message with client list (should include "Pilih Client")
+        const clientMenuMessage = calls.find(call => 
+          call[1] && call[1].includes('Pilih Client')
+        );
+        
+        if (clientMenuMessage) {
+          const message = clientMenuMessage[1];
+          
+          // Verify that special characters are escaped in the message
+          // The message should contain escaped versions, not raw special characters
+          expect(message).toContain('POLRES\\_BANDUNG');
+          expect(message).toContain('POLRES BANDUNG\\*CITY');
+          expect(message).toContain('DITBINMAS\\_\\[HQ\\]');
+          expect(message).toContain('Direktorat \\`Special\\`');
+          expect(message).toContain('\\[ORG\\]');
+          expect(message).toContain('\\[DIR\\]');
+          
+          // Verify that escapeMarkdown was called for client data
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('POLRES_BANDUNG');
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('POLRES BANDUNG*CITY');
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('DITBINMAS_[HQ]');
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('Direktorat `Special`');
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('ORG');
+          expect(mockEscapeMarkdown).toHaveBeenCalledWith('DIR');
+        }
       }
     });
   });
