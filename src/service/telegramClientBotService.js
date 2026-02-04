@@ -17,6 +17,11 @@ let isInitialized = false;
 const userSessions = new Map();
 // Default client ID when no clients are available
 const DEFAULT_CLIENT_ID = 'DITBINMAS';
+// Number emojis for displaying client selection menu (supports up to 10 clients)
+const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+// Minimum threshold for using space as split point when chunking messages (0.8 = 80%)
+// This ensures we don't split too far back from the maximum length, keeping chunks reasonably sized
+const MIN_SPACE_THRESHOLD = 0.8;
 
 /**
  * Initialize the Telegram Client Bot
@@ -232,10 +237,9 @@ async function showClientSelection(chatId) {
     let clientMenu = '📋 *Pilih Client*\n\n';
     clientMenu += 'Pilih client yang ingin Anda gunakan:\n\n';
     
-    // Emoji array supports up to 10 clients visually
-    // For more than 10 clients, falls back to numeric format
+    // Display up to 10 clients with emoji numbers
     clients.slice(0, 10).forEach((client, index) => {
-      const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index];
+      const numberEmoji = NUMBER_EMOJIS[index];
       const nama = client.nama || client.client_id;
       clientMenu += `${numberEmoji} ${client.client_id} - ${nama}\n`;
     });
@@ -389,7 +393,8 @@ async function handleMenuSelection(chatId, menuNumber, from) {
                 if (remaining.length > maxLength) {
                   // Look for last space before maxLength
                   const lastSpace = remaining.lastIndexOf(' ', maxLength);
-                  if (lastSpace > maxLength * 0.8) { // Only use space if it's not too far back
+                  // Only use space if it's not too far back (within MIN_SPACE_THRESHOLD)
+                  if (lastSpace > maxLength * MIN_SPACE_THRESHOLD) {
                     splitPoint = lastSpace;
                   }
                 }
