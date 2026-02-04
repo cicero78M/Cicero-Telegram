@@ -360,11 +360,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
     const result = await runClientRequestAction({
       action: menuNumber,
       clientId: clientId,
-      chatId: chatIdStr,
-      context: {
-        username: from.username || from.first_name || 'telegram_user',
-        chatId: chatIdStr,
-      }
+      chatId: chatIdStr
     });
     
     // Send the result back to user

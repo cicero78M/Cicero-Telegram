@@ -17,15 +17,11 @@ const DITBINMAS_CLIENT_ID = "DITBINMAS";
  * 
  * @param {string} action - Menu number selected by user
  * @param {string} clientId - Selected client ID
- * @param {string} chatId - Telegram chat ID
- * @param {object} context - Additional context (username, etc.)
  * @returns {Promise<string>} Formatted response message
  */
 async function performAction(
   action,
-  clientId,
-  chatId,
-  context = {}
+  clientId
 ) {
   let msg = "";
   const targetId = (clientId || DITBINMAS_CLIENT_ID).toUpperCase();
@@ -149,14 +145,12 @@ async function handleAdminMenu(clientId, clientLabel) {
  * @param {string} params.action - Menu number
  * @param {string} params.clientId - Client ID
  * @param {string} params.chatId - Telegram chat ID
- * @param {object} params.context - Additional context
  * @returns {Promise<string>} Response message
  */
 export async function runClientRequestAction({
   action,
   clientId,
-  chatId,
-  context = {}
+  chatId
 } = {}) {
   if (!action) {
     throw new Error("Action menu wajib diisi");
@@ -170,9 +164,7 @@ export async function runClientRequestAction({
 
   return performAction(
     normalizedAction,
-    normalizedClient,
-    chatId,
-    context
+    normalizedClient
   );
 }
 
