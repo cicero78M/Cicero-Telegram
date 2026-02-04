@@ -363,7 +363,7 @@ async function showClientSelection(chatId, clientType = null) {
       const numberEmoji = NUMBER_EMOJIS[index];
       const nama = escapeMarkdown(client.nama || client.client_id);
       const clientId = escapeMarkdown(client.client_id);
-      const type = client.client_type ? ` \\[${escapeMarkdown(client.client_type)}\\]` : '';
+      const type = client.client_type ? escapeMarkdown(` [${client.client_type}]`) : '';
       clientMenu += `${numberEmoji} ${clientId} - ${nama}${type}\n`;
     });
     
