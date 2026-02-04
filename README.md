@@ -34,25 +34,83 @@ Role-aware deactivation flows (per-role removal across menus and REST) are cover
 ## Folder Structure
 
 ```
-Cicero_V2/
-├── app.js                       # Application entry point
+Cicero-Telegram/
+├── app.js                       # Application entry point (Telegram bots)
 ├── package.json                 # NPM configuration
+├── ecosystem.config.js          # PM2 deployment configuration
 ├── src/
 │   ├── config/                  # Environment and Redis config
-│   ├── db/                      # Database adapters
-│   ├── controller/              # Express controllers
-│   ├── model/                   # Database models
-│   ├── cron/                    # Scheduled jobs
-│   ├── handler/                 # Menu logic
-│   ├── service/                 # Business services
-│   ├── repository/              # Query helpers
-│   ├── utils/                   # Utility functions
-│   ├── routes/                  # Express routers
-│   ├── middleware/              # Global middleware
-│   └── data/                    # Static datasets (e.g. satker mappings)
-├── laphar/                      # Legacy recap artefacts kept for reference
-├── pegiat_medsos_apps/          # Android client (embedded reference copy)
-└── tests/                       # Jest tests
+│   │   ├── env.js              # Envalid environment validation
+│   │   ├── redis.js            # Redis client setup
+│   │   └── dashboardPremium.js # Premium tier configuration
+│   ├── db/                      # Database adapters (multi-DB support)
+│   │   ├── index.js            # DB factory/dispatcher
+│   │   ├── postgres.js         # PostgreSQL connection pool
+│   │   ├── mysql.js            # MySQL adapter
+│   │   └── sqlite.js           # SQLite adapter
+│   ├── model/                   # Database models (34+ models)
+│   │   ├── userModel.js        # User accounts
+│   │   ├── clientModel.js      # Client organizations
+│   │   ├── instaPostModel.js   # Instagram posts
+│   │   ├── tiktokPostModel.js  # TikTok posts
+│   │   └── [30+ more models]   # Subscriptions, events, logs, etc.
+│   ├── handler/                 # Business logic and menu handlers
+│   │   ├── menu/               # Telegram bot menu handlers
+│   │   │   ├── dirRequestHandlers.js      # Directorate bot menus
+│   │   │   ├── oprRequestHandlers.js      # Operator bot menus
+│   │   │   ├── userMenuHandlers.js        # User bot menus
+│   │   │   ├── clientRequestHandlers.js   # Client bot menus
+│   │   │   └── clientRequestTelegramHandlers.js
+│   │   ├── fetchabsensi/       # Attendance & engagement tracking
+│   │   │   ├── insta/          # Instagram attendance handlers
+│   │   │   ├── tiktok/         # TikTok attendance handlers
+│   │   │   ├── link/           # Link amplification tracking
+│   │   │   ├── wa/             # WhatsApp registration handlers
+│   │   │   └── dashboard/      # Dashboard login tracking
+│   │   ├── fetchpost/          # Social media post fetching
+│   │   ├── fetchengagement/    # Engagement metric fetching
+│   │   └── datamining/         # Data mining operations
+│   ├── service/                 # Business services (75+ services)
+│   │   ├── telegramDirektoratBotService.js  # Directorate bot
+│   │   ├── telegramOperatorBotService.js    # Operator bot
+│   │   ├── telegramUserBotService.js        # User bot
+│   │   ├── telegramClientBotService.js      # Client bot
+│   │   ├── instaRapidService.js # Instagram API with fallback
+│   │   ├── tiktokRapidService.js # TikTok API with fallback
+│   │   ├── emailService.js      # SMTP email delivery
+│   │   ├── otpService.js        # OTP generation/validation
+│   │   ├── googleContactsService.js # Google People API sync
+│   │   ├── rabbitMQService.js   # RabbitMQ queue management
+│   │   ├── premiumService.js    # Subscription management
+│   │   ├── aggregatorService.js # Dashboard analytics
+│   │   └── [60+ more services]  # Reports, Excel, WhatsApp, etc.
+│   ├── repository/              # Database query helpers
+│   │   ├── db.js               # Generic query wrapper
+│   │   └── clientContactRepository.js
+│   ├── middleware/              # Express middleware
+│   │   └── debugHandler.js     # Debug logging middleware
+│   ├── utils/                   # Utility functions (20+ utilities)
+│   │   ├── logger.js           # Winston-based logging
+│   │   ├── response.js         # Response formatter
+│   │   ├── crypt.js            # CryptoJS encryption
+│   │   ├── requestHash.js      # Request deduplication
+│   │   ├── telegramBotHelpers.js # Telegram formatting
+│   │   ├── excelHelper.js      # XLSX generation
+│   │   └── [14+ more utils]    # Various helpers
+│   └── data/                    # Static datasets
+│       └── satkerDspMap.js     # Satker to DSP mapping
+├── docs/                        # Documentation (44+ markdown files)
+│   ├── telegram_multi_bot_setup.md  # Multi-bot setup guide
+│   ├── enterprise_architecture.md   # System architecture
+│   ├── database_structure.md        # Database schema
+│   ├── naming_conventions.md        # Code style guide
+│   └── [40+ more docs]              # API guides, workflows, etc.
+├── sql/                         # Database schema and migrations
+│   ├── schema.sql              # Database schema definition
+│   └── migrations/             # Migration scripts
+├── scripts/                     # Utility scripts
+├── laphar/                      # Legacy recap artefacts (reference)
+└── tests/                       # Jest test suites
 ```
 
 ---
