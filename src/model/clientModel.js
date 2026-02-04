@@ -540,3 +540,25 @@ export async function findChildrenByParent(parentClientId) {
   );
   return res.rows;
 }
+
+// Update client status (activate/deactivate)
+export const updateClientStatus = async (client_id, status) => {
+  try {
+    const res = await query(
+      'UPDATE clients SET client_status = $1 WHERE LOWER(client_id) = LOWER($2) RETURNING *',
+      [status, client_id]
+    );
+    
+    if (!res || !res.rows || res.rows.length === 0) {
+      console.error('[clientModel] updateClientStatus: Client not found:', client_id);
+      return null;
+    }
+    
+    console.log(`[clientModel] updateClientStatus: Updated client ${client_id} status to ${status}`);
+    return res.rows[0];
+  } catch (error) {
+    console.error('[clientModel] updateClientStatus: Database error:', error.message);
+    console.error('[clientModel] updateClientStatus: Error stack:', error.stack);
+    throw new Error(`Failed to update client status: ${error.message}`);
+  }
+};

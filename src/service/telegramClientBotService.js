@@ -10,7 +10,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { runClientRequestAction } from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
   findAllActiveClients,
-  findAllInactiveClients
+  findAllInactiveClients,
+  toggleClientStatus
 } from './clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
@@ -192,6 +193,12 @@ function setupMessageHandlers() {
     // Check if user is in inactive client selection mode
     if (session && session.step === 'choose_inactive_client') {
       await handleInactiveClientSelection(chatId, text, msg.from);
+      return;
+    }
+    
+    // Check if user is confirming status change
+    if (session && session.step === 'confirm_status_change') {
+      await handleStatusChangeConfirmation(chatId, text, msg.from);
       return;
     }
     
@@ -839,6 +846,11 @@ async function handleInactiveClientSelection(chatId, text, from) {
       return;
     }
     
+    // Store selected client in session for potential status change
+    session.selectedInactiveClient = selectedClient;
+    session.step = 'confirm_status_change';
+    userSessions.set(chatId, session);
+    
     // Display inactive client details
     const clientId = escapeMarkdown(selectedClient.client_id);
     const nama = escapeMarkdown(selectedClient.nama || selectedClient.client_id);
@@ -862,8 +874,11 @@ async function handleInactiveClientSelection(chatId, text, from) {
     }
     
     detailsMessage += `\n*Catatan:* Client ini tidak aktif dan tidak dapat digunakan untuk operasi.\n\n`;
-    detailsMessage += `Untuk mengaktifkan kembali client ini, hubungi administrator sistem.\n\n`;
-    detailsMessage += `Ketik /menu untuk kembali ke menu utama atau pilih client lain.`;
+    detailsMessage += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    detailsMessage += `*Opsi Pengelolaan:*\n`;
+    detailsMessage += `Ketik *AKTIFKAN* untuk mengaktifkan client ini\n`;
+    detailsMessage += `Ketik *KEMBALI* untuk kembali ke daftar\n`;
+    detailsMessage += `Ketik /menu untuk kembali ke menu utama`;
     
     await clientBot.sendMessage(chatId, detailsMessage, { parse_mode: 'Markdown' });
     
@@ -884,6 +899,108 @@ async function handleInactiveClientSelection(chatId, text, from) {
       }
     }
     
+    errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
+    
+    if (clientBot) {
+      await clientBot.sendMessage(chatId, errorMessage);
+    }
+  }
+}
+
+/**
+ * Handle status change confirmation for inactive client
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input text
+ * @param {object} from - Telegram user info
+ */
+async function handleStatusChangeConfirmation(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in handleStatusChangeConfirmation');
+    return;
+  }
+  
+  try {
+    console.log(`[Telegram Client Bot] Processing status change confirmation for chat ${chatId}, input: "${text}"`);
+    
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedInactiveClient) {
+      console.warn('[Telegram Client Bot] Session not found or no selected client for chat:', chatId);
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak ditemukan. Silakan ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const selectedClient = session.selectedInactiveClient;
+    const input = text.trim().toUpperCase();
+    
+    // Handle "back" command
+    if (input === 'KEMBALI' || input === 'BACK') {
+      console.log('[Telegram Client Bot] User wants to go back to inactive client list');
+      // Go back to inactive client selection
+      session.step = 'choose_inactive_client';
+      delete session.selectedInactiveClient;
+      userSessions.set(chatId, session);
+      await showInactiveClientSelection(chatId, 1);
+      return;
+    }
+    
+    // Handle activation command
+    if (input === 'AKTIFKAN' || input === 'ACTIVATE') {
+      console.log('[Telegram Client Bot] Attempting to activate client:', selectedClient.client_id);
+      
+      // Show processing message
+      await clientBot.sendMessage(chatId, '⏳ Sedang memproses aktivasi client...');
+      
+      try {
+        // Update client status to active
+        const updatedClient = await toggleClientStatus(selectedClient.client_id, true);
+        
+        if (!updatedClient) {
+          await clientBot.sendMessage(chatId, '❌ Gagal mengaktifkan client. Client tidak ditemukan.');
+          return;
+        }
+        
+        // Success message
+        const clientId = escapeMarkdown(selectedClient.client_id);
+        const nama = escapeMarkdown(selectedClient.nama || selectedClient.client_id);
+        
+        let successMessage = `✅ *Client Berhasil Diaktifkan*\n\n`;
+        successMessage += `*Client ID:* ${clientId}\n`;
+        successMessage += `*Nama:* ${nama}\n`;
+        successMessage += `*Status:* Aktif ✅\n\n`;
+        successMessage += `Client ini sekarang dapat digunakan untuk operasi.\n\n`;
+        successMessage += `Ketik /menu untuk kembali ke menu utama.`;
+        
+        await clientBot.sendMessage(chatId, successMessage, { parse_mode: 'Markdown' });
+        
+        console.log('[Telegram Client Bot] Client activated successfully:', selectedClient.client_id);
+        
+        // Clear session step and selected client
+        session.step = 'menu';
+        delete session.selectedInactiveClient;
+        userSessions.set(chatId, session);
+        
+      } catch (error) {
+        console.error('[Telegram Client Bot] Error activating client:', error);
+        await clientBot.sendMessage(
+          chatId,
+          `❌ Terjadi kesalahan saat mengaktifkan client.\n\nDetail: ${error.message}\n\nSilakan coba lagi atau ketik /menu untuk memulai ulang.`
+        );
+      }
+      return;
+    }
+    
+    // Invalid input
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Perintah tidak valid.\n\nSilakan ketik:\n*AKTIFKAN* - untuk mengaktifkan client\n*KEMBALI* - untuk kembali ke daftar\n/menu - untuk kembali ke menu utama`,
+      { parse_mode: 'Markdown' }
+    );
+    
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling status change confirmation:', error);
+    console.error('[Telegram Client Bot] Error stack:', error.stack);
+    
+    let errorMessage = '❌ Terjadi kesalahan saat memproses konfirmasi.\n\n';
     errorMessage += 'Silakan coba lagi atau ketik /menu untuk memulai ulang.';
     
     if (clientBot) {
