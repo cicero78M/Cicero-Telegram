@@ -27,6 +27,27 @@ export function normalizeEmail(value) {
   return String(value).trim().toLowerCase();
 }
 
+/**
+ * Normalize WhatsApp number to 62 format
+ * @param {string} value - Raw phone number input
+ * @returns {string} Normalized phone number with 62 prefix
+ */
+export function normalizeWhatsAppNumber(value) {
+  if (!value || value.trim() === '') return '';
+  
+  // Remove non-digit characters
+  const digitsOnly = value.replace(/\D/g, '');
+  
+  // Normalize to start with 62
+  if (digitsOnly.startsWith('0')) {
+    return '62' + digitsOnly.slice(1);
+  } else if (!digitsOnly.startsWith('62')) {
+    return '62' + digitsOnly;
+  } else {
+    return digitsOnly;
+  }
+}
+
 export function sortTitleKeys(keys, pangkatOrder) {
   // pangkatOrder: array urut dari DB
   return keys.slice().sort((a, b) => {
