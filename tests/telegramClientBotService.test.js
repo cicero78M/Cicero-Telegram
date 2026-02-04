@@ -367,4 +367,188 @@ describe('Telegram Client Bot Service - Error Handling', () => {
       expect(bot).toBeNull();
     });
   });
+
+  describe('Inactive Client Management', () => {
+    it('should display inactive clients when menu 7 is selected', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock inactive client list
+      const mockInactiveClients = [
+        { 
+          client_id: 'INACTIVE_ORG1', 
+          nama: 'Inactive Organization 1', 
+          client_type: 'ORG',
+          client_status: false 
+        },
+        { 
+          client_id: 'INACTIVE_DIR1', 
+          nama: 'Inactive Directorate 1', 
+          client_type: 'DIREKTORAT',
+          client_status: false 
+        },
+      ];
+      
+      mockFindAllInactiveClients.mockResolvedValue(mockInactiveClients);
+
+      // Simulate /menu command first
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Clear previous mock calls
+        mockSendMessage.mockClear();
+
+        // Now simulate selecting menu 7
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          const menuSelectMsg = {
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          };
+
+          await msgHandlerFn(menuSelectMsg);
+
+          // Verify that findAllInactiveClients was called
+          expect(mockFindAllInactiveClients).toHaveBeenCalled();
+
+          // Verify that a message was sent with inactive clients
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const inactiveClientMenu = calls.find(call => 
+            call[1] && call[1].includes('Kelola Client Tidak Aktif')
+          );
+          
+          expect(inactiveClientMenu).toBeDefined();
+          if (inactiveClientMenu) {
+            const message = inactiveClientMenu[1];
+            expect(message).toContain('INACTIVE_ORG1');
+            expect(message).toContain('INACTIVE_DIR1');
+            expect(message).toContain('⏸️'); // Inactive indicator
+          }
+        }
+      }
+    });
+
+    it('should show "no inactive clients" message when list is empty', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock empty inactive client list
+      mockFindAllInactiveClients.mockResolvedValue([]);
+
+      // Simulate /menu command first
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        // Now simulate selecting menu 7
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          const menuSelectMsg = {
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          };
+
+          await msgHandlerFn(menuSelectMsg);
+
+          // Verify that a message was sent indicating no inactive clients
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const noInactiveMsg = calls.find(call => 
+            call[1] && call[1].includes('Tidak ada client yang tidak aktif')
+          );
+          
+          expect(noInactiveMsg).toBeDefined();
+        }
+      }
+    });
+
+    it('should display details when inactive client is selected', async () => {
+      await initializeTelegramClientBot('test-token', true);
+      
+      // Mock inactive client list
+      const mockInactiveClients = [
+        { 
+          client_id: 'INACTIVE_TEST', 
+          nama: 'Inactive Test Client', 
+          client_type: 'ORG',
+          client_status: false,
+          client_group: 'TEST_GROUP'
+        },
+      ];
+      
+      mockFindAllInactiveClients.mockResolvedValue(mockInactiveClients);
+
+      // Simulate /menu and menu 7 selection
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          
+          // Select menu 7
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Now select the first inactive client
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '1',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Verify that client details were sent
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const detailsMsg = calls.find(call => 
+            call[1] && call[1].includes('Detail Client Tidak Aktif')
+          );
+          
+          expect(detailsMsg).toBeDefined();
+          if (detailsMsg) {
+            const message = detailsMsg[1];
+            expect(message).toContain('INACTIVE_TEST');
+            expect(message).toContain('Inactive Test Client');
+            expect(message).toContain('Tidak Aktif');
+            expect(message).toContain('tidak dapat digunakan untuk operasi');
+          }
+        }
+      }
+    });
+  });
 });
