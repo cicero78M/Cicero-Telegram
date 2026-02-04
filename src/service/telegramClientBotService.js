@@ -25,6 +25,8 @@ const userSessions = new Map();
 const DEFAULT_CLIENT_ID = 'DITBINMAS';
 // Number emojis for displaying client selection menu (supports up to 10 clients)
 const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+// Items per page for client list pagination
+const ITEMS_PER_PAGE = 10;
 // Minimum threshold for using space as split point when chunking messages (0.8 = 80%)
 // This ensures we don't split too far back from the maximum length, keeping chunks reasonably sized
 const MIN_SPACE_THRESHOLD = 0.8;
@@ -370,13 +372,11 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       console.warn(`[Telegram Client Bot] Filtered out ${clients.length - validClients.length} invalid clients`);
     }
     
-    // Get current page from session or default to 1
-    const session = userSessions.get(chatId) || {};
-    const currentPage = page !== undefined ? page : (session.currentPage || 1);
-    const itemsPerPage = 10;
-    const totalPages = Math.ceil(validClients.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, validClients.length);
+    // Get current page from parameter or default to 1
+    const currentPage = page;
+    const totalPages = Math.ceil(validClients.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, validClients.length);
     const pageClients = validClients.slice(startIndex, endIndex);
     
     // Create client selection menu
@@ -407,8 +407,10 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       }
     }
     
-    clientMenu += '\nBalas dengan *angka* (1-' + pageClients.length + ') atau *Client ID* yang tertera.';
-    clientMenu += '\nKetik *kembali* untuk memilih tipe client lain.';
+    clientMenu += '\n*Pilih Client:*\n';
+    clientMenu += `• Ketik angka emoji di atas (1-${pageClients.length})\n`;
+    clientMenu += '• Ketik Client ID lengkap untuk pilih langsung\n';
+    clientMenu += '• Ketik *kembali* untuk memilih tipe client lain';
     
     // Store clients in session with pagination info
     userSessions.set(chatId, {
@@ -667,12 +669,13 @@ async function handleClientSelection(chatId, text, from) {
       return;
     }
     
-    // Check if input is a page number
+    // Check if input is a page number for navigation
+    // Only treat as page navigation if it's explicitly for pagination (beyond client selection range)
     if (/^\d+$/.test(text.trim())) {
       const num = parseInt(text.trim(), 10);
       
-      // Check if it's a valid page number (not a client selection)
-      if (num > 10 && num <= totalPages) {
+      // If number is greater than items per page, treat as page navigation
+      if (num > ITEMS_PER_PAGE && num <= totalPages) {
         console.log(`[Telegram Client Bot] User requested page ${num}`);
         await showClientSelection(chatId, session.clientType, num);
         return;
@@ -687,9 +690,8 @@ async function handleClientSelection(chatId, text, from) {
       console.log(`[Telegram Client Bot] User selected index: ${index}`);
       
       // Calculate the actual index based on current page
-      const itemsPerPage = 10;
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const pageClients = clients.slice(startIndex, startIndex + itemsPerPage);
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const pageClients = clients.slice(startIndex, startIndex + ITEMS_PER_PAGE);
       
       if (index >= 0 && index < pageClients.length) {
         selectedClient = pageClients[index];

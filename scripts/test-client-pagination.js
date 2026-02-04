@@ -12,12 +12,12 @@ const mockClients = Array.from({ length: 37 }, (_, i) => ({
 }));
 
 const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const ITEMS_PER_PAGE = 10;
 
 function formatClientList(clients, page = 1) {
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(clients.length / itemsPerPage);
-  const startIndex = (page - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, clients.length);
+  const totalPages = Math.ceil(clients.length / ITEMS_PER_PAGE);
+  const startIndex = (page - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, clients.length);
   const pageClients = clients.slice(startIndex, endIndex);
 
   let menu = `📋 *Pilih Client - Organisasi (ORG) Inactive*\n\n`;
@@ -42,8 +42,10 @@ function formatClientList(clients, page = 1) {
     }
   }
 
-  menu += '\nBalas dengan *angka* (1-' + pageClients.length + ') atau *Client ID* yang tertera.';
-  menu += '\nKetik *kembali* untuk memilih tipe client lain.';
+  menu += '\n*Pilih Client:*\n';
+  menu += `• Ketik angka emoji di atas (1-${pageClients.length})\n`;
+  menu += '• Ketik Client ID lengkap untuk pilih langsung\n';
+  menu += '• Ketik *kembali* untuk memilih tipe client lain';
 
   return menu;
 }
@@ -73,11 +75,10 @@ function testPagination() {
   console.log('\n' + '='.repeat(80) + '\n');
 
   // Test pagination calculations
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(mockClients.length / itemsPerPage);
+  const totalPages = Math.ceil(mockClients.length / ITEMS_PER_PAGE);
   console.log('=== Pagination Calculations ===');
   console.log(`Total clients: ${mockClients.length}`);
-  console.log(`Items per page: ${itemsPerPage}`);
+  console.log(`Items per page: ${ITEMS_PER_PAGE}`);
   console.log(`Total pages: ${totalPages}`);
   console.log(`Page 1: Clients 1-10`);
   console.log(`Page 2: Clients 11-20`);
