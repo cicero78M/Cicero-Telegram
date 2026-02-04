@@ -29,7 +29,7 @@ CREATE TABLE penmas_user (
 
 ## 2. Register Endpoint
 
-Expose `/api/auth/penmas-register` in `src/routes/authRoutes.js`.
+Expose `/api/auth/penmas-register` endpoint.
 
 1. Validate `username`, `password`, and optionally `role` from the request body.
 2. Ensure the username is not already taken in `penmas_user`.
@@ -48,7 +48,7 @@ Example payload:
 
 ## 3. Login Endpoint
 
-Expose `/api/auth/penmas-login` in `src/routes/authRoutes.js`.
+Expose `/api/auth/penmas-login` endpoint.
 
 1. Validate `username` and `password` from the request body.
 2. Retrieve the user from `penmas_user` and compare the password hash using `bcrypt.compare`.

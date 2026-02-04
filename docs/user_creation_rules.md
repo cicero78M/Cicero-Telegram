@@ -1,7 +1,7 @@
 # Aturan `createUser` Endpoint
 *Last updated: 2025-11-19*
 
-Dokumen ini menjelaskan perilaku endpoint `createUser` pada controller `src/controller/userController.js` untuk skenario pembuatan atau reaktivasi user.
+Dokumen ini menjelaskan perilaku endpoint `createUser` untuk skenario pembuatan atau reaktivasi user.
 
 ## Penambahan User Baru
 - Operator boleh mengirimkan array `roles` di payload. Nilai yang dikirim akan diubah ke huruf kecil dan setiap role di-set ke `true` pada user baru.

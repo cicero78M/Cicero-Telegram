@@ -79,12 +79,11 @@ scope and cached premium flags rather than potentially stale JWT claims.
   rows whose `expires_at` is past the current time, expires them through
   `expireSubscription`, refreshes the dashboard cache, and sends a WhatsApp
   alert via the gateway client when a destination number is available.
-- `src/cron/cronDashboardSubscriptionExpiry.js` schedules the expiry sweep every
-  30 minutes (Asia/Jakarta) using `scheduleCronJob`; the module is loaded through
-  the cron manifest so WhatsApp readiness checks are honored before delivery.
-- `src/service/premiumExpiryService.js` finds mobile users whose
-  `premium_end_date` is in the past and revokes their premium flag.
-- `src/cron/cronPremiumExpiry.js` runs daily at midnight (Asia/Jakarta) to call
+- Subscription expiry check runs every 30 minutes (Asia/Jakarta); the module
+  is loaded through the cron manifest so WhatsApp readiness checks are honored before delivery.
+- Premium expiry service finds mobile users whose `premium_end_date` is in the
+  past and revokes their premium flag.
+- Premium expiry check runs daily at midnight (Asia/Jakarta) to call
   `processExpiredPremiumUsers`, ensuring mobile access windows close on time.
 
 ## Premium Request Workflow
@@ -214,7 +213,7 @@ authorized actor.
 - `expireDashboardPremiumRequests` marks pending/confirmed rows as `expired` once
   `expired_at` is reached, writes an audit row, and returns the affected
   requests.
-- `src/cron/cronDashboardPremiumRequestExpiry.js` runs hourly (Asia/Jakarta),
+- Dashboard premium request expiry check runs hourly (Asia/Jakarta),
   notifying requesters via the gateway client and sending an admin summary via
   `sendWAReport`.
 
