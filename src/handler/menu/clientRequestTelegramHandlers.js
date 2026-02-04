@@ -346,7 +346,7 @@ async function handleUpdateClientStart(clientId, clientLabel) {
 
 /**
  * Handle Update Data Client - Step 2: Show fields in selected group
- * @param {string} groupIndex - Selected group index (0-based)
+ * @param {number} groupIndex - Selected group index (0-based)
  * @param {string} clientId - Client ID
  * @param {string} clientLabel - Client label for display
  * @returns {object} Response object with message and selected group info
@@ -382,7 +382,7 @@ async function handleUpdateClientGroupSelection(groupIndex, clientId, clientLabe
 
 /**
  * Handle Update Data Client - Step 3: Prompt for field value
- * @param {string} fieldIndex - Selected field index (0-based)
+ * @param {number} fieldIndex - Selected field index (0-based)
  * @param {object} selectedGroup - Currently selected group
  * @param {string} clientLabel - Client label for display
  * @returns {object} Response object with message and selected field info
