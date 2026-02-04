@@ -9,11 +9,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { runClientRequestAction } from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
-  findAllActiveClients,
-  findAllActiveDirektoratClients,
-  findAllActiveOrgClients,
-  findAllInactiveOrgClients,
-  findAllInactiveDirektoratClients
+  findAllActiveClients
 } from './clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
