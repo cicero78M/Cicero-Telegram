@@ -7,13 +7,18 @@
  */
 
 import TelegramBot from 'node-telegram-bot-api';
-import { runClientRequestAction } from '../handler/menu/clientRequestTelegramHandlers.js';
+import { 
+  runClientRequestAction,
+  clientRequestTelegramHandlers
+} from '../handler/menu/clientRequestTelegramHandlers.js';
 import { 
   findAllActiveClients,
   findAllInactiveClients,
-  toggleClientStatus
+  toggleClientStatus,
+  findClientById
 } from './clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import { formatNama } from '../utils/utilsHelper.js';
 
 let clientBot = null;
 let isInitialized = false;
@@ -201,6 +206,18 @@ function setupMessageHandlers() {
     // Check if user is confirming status change
     if (session && session.step === 'confirm_status_change') {
       await handleStatusChangeConfirmation(chatId, text, msg.from);
+      return;
+    }
+    
+    // Check if user is in management submenu mode
+    if (session && session.step === 'management_submenu') {
+      await handleManagementSubmenuSelection(chatId, text.trim(), msg.from);
+      return;
+    }
+    
+    // Check if user is in management subaction mode
+    if (session && session.step === 'management_subaction') {
+      await handleManagementSubactionSelection(chatId, text.trim(), msg.from);
       return;
     }
     
@@ -1041,6 +1058,43 @@ async function handleMenuSelection(chatId, menuNumber, from) {
       return;
     }
     
+    // Handle menu 2 (Management Menu) - special case for interactive submenu
+    if (menuNumber === '2') {
+      console.log('[Telegram Client Bot] User selected menu 2 - Management Menu');
+      const session = userSessions.get(chatId);
+      let clientId = DEFAULT_CLIENT_ID;
+      let clientName = DEFAULT_CLIENT_ID;
+      
+      if (session && session.selectedClientId) {
+        clientId = session.selectedClientId;
+        clientName = session.clientName || clientId;
+      }
+      
+      // Update session to submenu mode
+      userSessions.set(chatId, {
+        ...session,
+        step: 'management_submenu',
+        selectedMenu: '2',
+        selectedClientId: clientId,
+        clientName: clientName
+      });
+      
+      // Show submenu
+      const client = await findClientById(clientId);
+      const clientLabel = client?.nama
+        ? `${formatNama(client.nama)} (${clientId})`
+        : clientId;
+      
+      const result = await runClientRequestAction({
+        action: '2',
+        clientId: clientId,
+        chatId: chatId.toString()
+      });
+      
+      await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+      return;
+    }
+    
     // Get user session to retrieve selected client
     const session = userSessions.get(chatId);
     let clientId = DEFAULT_CLIENT_ID; // Default fallback
@@ -1134,6 +1188,122 @@ async function handleMenuSelection(chatId, menuNumber, from) {
         `❌ Terjadi kesalahan saat memproses menu ${menuNumber}.\n\nError: ${error.message}`
       );
     }
+  }
+}
+
+/**
+ * Handle submenu selection in Management Menu (menu 2)
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} submenu - Submenu number (1-5)
+ * @param {object} from - User info from Telegram
+ */
+async function handleManagementSubmenuSelection(chatId, submenu, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    
+    console.log(`[Telegram Client Bot] Processing submenu ${submenu} for client ${clientId}`);
+    
+    // If submenu is 1 or 2, it has sub-actions, so set step to subaction mode
+    if (submenu === '1' || submenu === '2') {
+      userSessions.set(chatId, {
+        ...session,
+        step: 'management_subaction',
+        selectedSubmenu: submenu
+      });
+    } else {
+      // For submenus 3, 4, 5 - direct action
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu' // Reset to menu mode after action
+      });
+    }
+    
+    const client = await findClientById(clientId);
+    const clientLabel = client?.nama
+      ? `${formatNama(client.nama)} (${clientId})`
+      : clientId;
+    
+    // Call the handler
+    const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
+      submenu,
+      null, // no subaction yet
+      clientId,
+      clientLabel
+    );
+    
+    await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling submenu:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Handle subaction selection in Management Menu (menu 2.1 or 2.2)
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} subaction - Subaction number
+ * @param {object} from - User info from Telegram
+ */
+async function handleManagementSubactionSelection(chatId, subaction, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized');
+    return;
+  }
+  
+  try {
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId || !session.selectedSubmenu) {
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak valid. Ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    const submenu = session.selectedSubmenu;
+    
+    console.log(`[Telegram Client Bot] Processing subaction ${submenu}.${subaction} for client ${clientId}`);
+    
+    // Reset to menu mode after action
+    userSessions.set(chatId, {
+      ...session,
+      step: 'menu'
+    });
+    
+    const client = await findClientById(clientId);
+    const clientLabel = client?.nama
+      ? `${formatNama(client.nama)} (${clientId})`
+      : clientId;
+    
+    // Call the handler
+    const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
+      submenu,
+      subaction,
+      clientId,
+      clientLabel
+    );
+    
+    await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling subaction:', error);
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}`
+    );
   }
 }
 

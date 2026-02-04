@@ -6,8 +6,12 @@
  * Following naming conventions: camelCase for functions and file names
  */
 
-import { findClientById } from "../../service/clientService.js";
+import { 
+  findClientById, 
+  getClientSummary
+} from "../../service/clientService.js";
 import { getGreeting, formatNama } from "../../utils/utilsHelper.js";
+import { refreshAggregatorData } from "../../service/aggregatorService.js";
 
 const DITBINMAS_CLIENT_ID = "DITBINMAS";
 
@@ -75,9 +79,9 @@ async function performAction(
 }
 
 /**
- * Handle Add Client menu (menu 1)
+ * Handle Tambah Client Baru submenu (menu 1)
  */
-async function handleAddClientMenu(clientId, clientLabel) {
+async function handleAddClientMenu() {
   const salam = getGreeting();
   return `${salam}!\n\n` +
     `➕ *Tambah Client Baru*\n\n` +
@@ -94,19 +98,25 @@ async function handleAddClientMenu(clientId, clientLabel) {
 
 /**
  * Handle Management menu (menu 2)
+ * Now displays interactive submenu options
  */
 async function handleManagementMenu(clientId, clientLabel) {
   const salam = getGreeting();
   return `${salam}!\n\n` +
     `📋 *Manajemen Client & User*\n` +
     `Client: ${clientLabel}\n\n` +
-    `Menu manajemen client dan user mencakup:\n` +
-    `• Kelola client (update/hapus/info)\n` +
-    `• Kelola user (update/exception/status)\n` +
-    `• Hapus WA User\n` +
-    `• Penghapusan Massal Status User\n` +
-    `• Refresh Aggregator Direktorat\n\n` +
-    FEATURE_IN_DEVELOPMENT_MSG;
+    `Pilih submenu yang ingin Anda akses:\n\n` +
+    `1️⃣ *Kelola Client*\n` +
+    `   Update, hapus, atau lihat info client\n\n` +
+    `2️⃣ *Kelola User*\n` +
+    `   Update, exception, atau status user\n\n` +
+    `3️⃣ *Hapus WA User*\n` +
+    `   Hapus nomor WhatsApp dari user\n\n` +
+    `4️⃣ *Penghapusan Massal Status User*\n` +
+    `   Hapus status user secara massal\n\n` +
+    `5️⃣ *Refresh Aggregator Direktorat*\n` +
+    `   Refresh data aggregator direktorat\n\n` +
+    `Ketik nomor submenu (1-5) untuk melanjutkan, atau ketik /menu untuk kembali.`;
 }
 
 /**
@@ -161,6 +171,162 @@ async function handleAdminMenu(clientId, clientLabel) {
 }
 
 /**
+ * Handle Kelola Client submenu (2.1)
+ */
+async function handleKelolaClientMenu(clientId, clientLabel) {
+  return `🏢 *Kelola Client*\n` +
+    `Client: ${clientLabel}\n\n` +
+    `Pilih aksi yang ingin dilakukan:\n\n` +
+    `1️⃣ *Update Data Client*\n` +
+    `   Perbarui informasi client\n\n` +
+    `2️⃣ *Hapus Client*\n` +
+    `   Hapus client dari sistem\n\n` +
+    `3️⃣ *Info Client*\n` +
+    `   Tampilkan detail client\n\n` +
+    `Ketik nomor aksi (1-3) atau /menu untuk kembali.`;
+}
+
+/**
+ * Handle Info Client (2.1.3)
+ */
+async function handleClientInfo(clientId) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return `❌ Client dengan ID ${clientId} tidak ditemukan.`;
+    }
+
+    const summary = await getClientSummary(clientId);
+    const status = client.client_status ? '✅ Aktif' : '❌ Tidak Aktif';
+    
+    let info = `📊 *Informasi Client*\n\n`;
+    info += `🆔 *Client ID*: ${client.client_id}\n`;
+    info += `📛 *Nama*: ${client.nama || '-'}\n`;
+    info += `📍 *Status*: ${status}\n`;
+    info += `🏷️ *Tipe*: ${client.client_type || '-'}\n`;
+    info += `👥 *Group*: ${client.client_group || '-'}\n`;
+    
+    if (summary) {
+      info += `\n📈 *Statistik*:\n`;
+      info += `• Jumlah User: ${summary.user_count || 0}\n`;
+      info += `• Post Instagram: ${summary.insta_post_count || 0}\n`;
+      info += `• Post TikTok: ${summary.tiktok_post_count || 0}\n`;
+      info += `• Total Likes Instagram: ${summary.total_insta_likes || 0}\n`;
+      info += `• Total Komentar TikTok: ${summary.total_tiktok_comments || 0}\n`;
+    }
+    
+    return info;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error getting client info:', error);
+    return `❌ Gagal mengambil informasi client: ${error.message}`;
+  }
+}
+
+/**
+ * Handle Kelola User submenu (2.2)
+ */
+async function handleKelolaUserMenu(clientId, clientLabel) {
+  return `👥 *Kelola User*\n` +
+    `Client: ${clientLabel}\n\n` +
+    `Pilih aksi yang ingin dilakukan:\n\n` +
+    `1️⃣ *Update Data User*\n` +
+    `   Perbarui informasi user\n\n` +
+    `2️⃣ *Kelola Exception User*\n` +
+    `   Lihat user dengan exception\n\n` +
+    `3️⃣ *Ubah Status User*\n` +
+    `   Aktifkan atau nonaktifkan user\n\n` +
+    `Ketik nomor aksi (1-3) atau /menu untuk kembali.`;
+}
+
+/**
+ * Handle Hapus WA User (2.3)
+ */
+async function handleHapusWAUserPrompt(clientId, clientLabel) {
+  return `📱 *Hapus WA User*\n` +
+    `Client: ${clientLabel}\n\n` +
+    `Fitur ini menghapus nomor WhatsApp dari user.\n\n` +
+    `Masukkan User ID atau NRP yang akan dihapus nomor WhatsApp-nya, atau ketik /menu untuk kembali.`;
+}
+
+/**
+ * Handle Bulk Status (2.4)
+ */
+async function handleBulkStatusPrompt(clientId, clientLabel) {
+  return `🗑️ *Penghapusan Massal Status User*\n` +
+    `Client: ${clientLabel}\n\n` +
+    `Fitur ini menonaktifkan status user secara massal.\n\n` +
+    `Masukkan daftar User ID/NRP (dipisahkan dengan koma atau spasi), atau ketik /menu untuk kembali.`;
+}
+
+/**
+ * Handle Refresh Aggregator (2.5)
+ */
+async function handleRefreshAggregator() {
+  try {
+    await refreshAggregatorData();
+    return `✅ *Refresh Aggregator Berhasil*\n\n` +
+      `Data aggregator direktorat telah diperbarui.`;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error refreshing aggregator:', error);
+    return `❌ Gagal refresh aggregator: ${error.message}`;
+  }
+}
+
+/**
+ * Handle submenu actions for Management Menu (menu 2)
+ * @param {string} submenu - Submenu number (1-5)
+ * @param {string} subaction - Optional sub-action within submenu
+ * @param {string} clientId - Client ID
+ * @param {string} clientLabel - Client label for display
+ * @returns {Promise<string>} Response message
+ */
+async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel) {
+  switch (submenu) {
+    case "1": // Kelola Client
+      if (!subaction) {
+        return handleKelolaClientMenu(clientId, clientLabel);
+      }
+      switch (subaction) {
+        case "1": // Update Data Client
+          return `ℹ️ *Update Data Client*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        case "2": // Hapus Client
+          return `⚠️ *Hapus Client*\n\nPenghapusan client adalah operasi berbahaya yang memerlukan konfirmasi admin.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        case "3": // Info Client
+          return handleClientInfo(clientId);
+        default:
+          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-3).`;
+      }
+    
+    case "2": // Kelola User
+      if (!subaction) {
+        return handleKelolaUserMenu(clientId, clientLabel);
+      }
+      switch (subaction) {
+        case "1": // Update Data User
+          return `ℹ️ *Update Data User*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        case "2": // Kelola Exception User
+          return `ℹ️ *Kelola Exception User*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        case "3": // Ubah Status User
+          return `ℹ️ *Ubah Status User*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        default:
+          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-3).`;
+      }
+    
+    case "3": // Hapus WA User
+      return handleHapusWAUserPrompt(clientId, clientLabel);
+    
+    case "4": // Bulk Status
+      return handleBulkStatusPrompt(clientId, clientLabel);
+    
+    case "5": // Refresh Aggregator
+      return handleRefreshAggregator();
+    
+    default:
+      return `❌ Submenu tidak valid. Ketik nomor submenu yang valid (1-5).`;
+  }
+}
+
+/**
  * Wrapper function to run client request action
  * Similar to runDirRequestAction in dirRequestHandlers
  * 
@@ -199,9 +365,16 @@ export const clientRequestTelegramHandlers = {
   performAction,
   handleAddClientMenu,
   handleManagementMenu,
+  handleManagementSubmenu,
   handleSocialMediaMenu,
   handleTransferReportMenu,
-  handleAdminMenu
+  handleAdminMenu,
+  handleKelolaClientMenu,
+  handleKelolaUserMenu,
+  handleClientInfo,
+  handleHapusWAUserPrompt,
+  handleBulkStatusPrompt,
+  handleRefreshAggregator
 };
 
 export default clientRequestTelegramHandlers;
