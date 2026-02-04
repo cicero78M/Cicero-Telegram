@@ -161,6 +161,25 @@ export const findAllInactiveDirektorat = async () => {
   return res.rows;
 };
 
+// Ambil semua client yang tidak aktif (all types)
+export const findAllInactive = async () => {
+  try {
+    const res = await query('SELECT * FROM clients WHERE client_status = false ORDER BY client_id');
+    
+    if (!res || !res.rows) {
+      console.error('[clientModel] findAllInactive: Query returned invalid response');
+      throw new Error('Invalid query response - missing rows');
+    }
+    
+    console.log(`[clientModel] findAllInactive: Found ${res.rows.length} inactive clients`);
+    return res.rows;
+  } catch (error) {
+    console.error('[clientModel] findAllInactive: Database error:', error.message);
+    console.error('[clientModel] findAllInactive: Error stack:', error.stack);
+    throw new Error(`Failed to fetch inactive clients: ${error.message}`);
+  }
+};
+
 export const findAllActiveDirektoratWithSosmed = async () => {
   const selectColumns = await buildClientSelect(
     [
