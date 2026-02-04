@@ -47,6 +47,8 @@ export const env = cleanEnv(process.env, {
   TELEGRAM_OPERATOR_BOT_ENABLED: bool({ default: false }),
   TELEGRAM_USER_BOT_TOKEN: str({ default: '' }),
   TELEGRAM_USER_BOT_ENABLED: bool({ default: false }),
+  TELEGRAM_CLIENT_BOT_TOKEN: str({ default: '' }),
+  TELEGRAM_CLIENT_BOT_ENABLED: bool({ default: false }),
   // Legacy support - kept for backward compatibility
   TELEGRAM_BOT_TOKEN: str({ default: '' }),
   TELEGRAM_BOT_ENABLED: bool({ default: false })
