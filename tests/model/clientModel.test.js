@@ -7,9 +7,10 @@ jest.unstable_mockModule('../../src/repository/db.js', () => ({
 }));
 
 let findBySuperAdmin;
+let updateClientStatus;
 
 beforeAll(async () => {
-  ({ findBySuperAdmin } = await import('../../src/model/clientModel.js'));
+  ({ findBySuperAdmin, updateClientStatus } = await import('../../src/model/clientModel.js'));
 });
 
 beforeEach(() => {
@@ -40,5 +41,79 @@ describe('findBySuperAdmin', () => {
 
     expect(mockQuery).toHaveBeenCalledTimes(1);
     expect(result).toBeNull();
+  });
+});
+
+describe('updateClientStatus', () => {
+  test('successfully updates client status to true', async () => {
+    const mockClient = {
+      client_id: 'TEST_CLIENT',
+      nama: 'Test Client',
+      client_status: true,
+      client_type: 'ORG',
+    };
+    mockQuery.mockResolvedValueOnce({ rows: [mockClient] });
+
+    const result = await updateClientStatus('TEST_CLIENT', true);
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(sql).toContain('UPDATE clients SET client_status = $1');
+    expect(sql).toContain('WHERE LOWER(client_id) = LOWER($2)');
+    expect(params).toEqual([true, 'TEST_CLIENT']);
+    expect(result).toEqual(mockClient);
+  });
+
+  test('successfully updates client status to false', async () => {
+    const mockClient = {
+      client_id: 'TEST_CLIENT',
+      nama: 'Test Client',
+      client_status: false,
+      client_type: 'ORG',
+    };
+    mockQuery.mockResolvedValueOnce({ rows: [mockClient] });
+
+    const result = await updateClientStatus('TEST_CLIENT', false);
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(params).toEqual([false, 'TEST_CLIENT']);
+    expect(result).toEqual(mockClient);
+  });
+
+  test('returns null when client is not found', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const result = await updateClientStatus('NON_EXISTENT', true);
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+  });
+
+  test('handles database errors gracefully', async () => {
+    const error = new Error('Database connection failed');
+    mockQuery.mockRejectedValueOnce(error);
+
+    await expect(updateClientStatus('TEST_CLIENT', true)).rejects.toThrow(
+      'Failed to update client status: Database connection failed'
+    );
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  test('is case-insensitive for client_id', async () => {
+    const mockClient = {
+      client_id: 'TEST_CLIENT',
+      nama: 'Test Client',
+      client_status: true,
+    };
+    mockQuery.mockResolvedValueOnce({ rows: [mockClient] });
+
+    const result = await updateClientStatus('test_client', true);
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(params).toEqual([true, 'test_client']);
+    expect(result).toEqual(mockClient);
   });
 });
