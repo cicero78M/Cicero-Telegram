@@ -85,7 +85,7 @@ async function handleAddClientMenu(clientId, clientLabel) {
     `• Regional ID (untuk DIREKTORAT)\n` +
     `• Parent Client ID (opsional)\n\n` +
     `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard untuk menambahkan client baru.`;
+    `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard untuk menambahkan client baru.`;
 }
 
 /**
@@ -103,7 +103,7 @@ async function handleManagementMenu(clientId, clientLabel) {
     `• Penghapusan Massal Status User\n` +
     `• Refresh Aggregator Direktorat\n\n` +
     `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
 }
 
 /**
@@ -122,7 +122,7 @@ async function handleSocialMediaMenu(clientId, clientLabel) {
     `• Hapus konten TikTok\n` +
     `• Cek status akun\n\n` +
     `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
 }
 
 /**
@@ -139,7 +139,7 @@ async function handleTransferReportMenu(clientId, clientLabel) {
     `• Export data user\n` +
     `• Sinkronisasi data\n\n` +
     `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
 }
 
 /**
@@ -157,7 +157,7 @@ async function handleAdminMenu(clientId, clientLabel) {
     `• Update data client\n` +
     `• Kelola Akun Resmi Satbinmas\n\n` +
     `ℹ️ Fitur ini memerlukan integrasi lebih lanjut untuk operasi melalui Telegram.\n` +
-    `Untuk saat ini, silakan gunakan interface WhatsApp atau web dashboard.`;
+    `Untuk saat ini, silakan gunakan antarmuka WhatsApp atau web dashboard.`;
 }
 
 /**

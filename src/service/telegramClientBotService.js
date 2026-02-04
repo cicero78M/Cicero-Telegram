@@ -146,7 +146,7 @@ function setupCommandHandlers() {
     if (!session || !session.selectedClientId) {
       userSessions.set(chatId, {
         selectedClientId: DEFAULT_CLIENT_ID,
-        clientName: DEFAULT_CLIENT_ID,
+        clientName: 'DITBINMAS',  // Human-readable name
         step: 'menu'
       });
       console.log(`[Telegram Client Bot] Initialized session with default client ${DEFAULT_CLIENT_ID} for chat ${chatId}`);
@@ -611,7 +611,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
       // Initialize with default client if no session exists
       userSessions.set(chatId, {
         selectedClientId: DEFAULT_CLIENT_ID,
-        clientName: DEFAULT_CLIENT_ID,
+        clientName: 'DITBINMAS',  // Human-readable name
         step: 'menu'
       });
       clientId = DEFAULT_CLIENT_ID;
