@@ -30,6 +30,7 @@ const mockFindAllActiveOrgClients = jest.fn();
 const mockFindAllInactiveOrgClients = jest.fn();
 const mockFindAllInactiveDirektoratClients = jest.fn();
 const mockFindAllInactiveClients = jest.fn();
+const mockToggleClientStatus = jest.fn();
 jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllActiveClients: mockFindAllActiveClients,
   findAllActiveDirektoratClients: mockFindAllActiveDirektoratClients,
@@ -37,6 +38,7 @@ jest.unstable_mockModule('../src/service/clientService.js', () => ({
   findAllInactiveOrgClients: mockFindAllInactiveOrgClients,
   findAllInactiveDirektoratClients: mockFindAllInactiveDirektoratClients,
   findAllInactiveClients: mockFindAllInactiveClients,
+  toggleClientStatus: mockToggleClientStatus,
 }));
 
 // Mock telegramBotHelpers
@@ -545,8 +547,233 @@ describe('Telegram Client Bot Service - Error Handling', () => {
             expect(message).toContain('INACTIVE_TEST');
             expect(message).toContain('Inactive Test Client');
             expect(message).toContain('Tidak Aktif');
-            expect(message).toContain('tidak dapat digunakan untuk operasi');
+            expect(message).toContain('AKTIFKAN');
+            expect(message).toContain('Opsi Pengelolaan');
+            expect(message).toContain('KEMBALI');
+            expect(message).toContain('/menu');
           }
+        }
+      }
+    });
+  });
+
+  describe('Client Status Toggle', () => {
+    it('should successfully activate an inactive client', async () => {
+      // Initialize the bot
+      await initializeTelegramClientBot('test-token', true);
+
+      const mockInactiveClients = [
+        {
+          client_id: 'INACTIVE_TEST',
+          nama: 'Inactive Test Client',
+          client_type: 'ORG',
+          client_status: false,
+          regional_id: 'TEST_REGION',
+        }
+      ];
+      
+      mockFindAllInactiveClients.mockResolvedValue(mockInactiveClients);
+
+      // Mock successful status toggle
+      mockToggleClientStatus.mockResolvedValue({
+        client_id: 'INACTIVE_TEST',
+        nama: 'Inactive Test Client',
+        client_type: 'ORG',
+        client_status: true,
+        regional_id: 'TEST_REGION',
+      });
+
+      // Simulate /menu and menu 7 selection
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          
+          // Select menu 7
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Select the first inactive client
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '1',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Send activation command
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: 'AKTIFKAN',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Verify activation was called
+          expect(mockToggleClientStatus).toHaveBeenCalledWith('INACTIVE_TEST', true);
+
+          // Verify success message was sent
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const successMsg = calls.find(call => 
+            call[1] && call[1].includes('Client Berhasil Diaktifkan')
+          );
+          
+          expect(successMsg).toBeDefined();
+          if (successMsg) {
+            const message = successMsg[1];
+            expect(message).toContain('INACTIVE_TEST');
+            expect(message).toContain('Status: Aktif');
+          }
+        }
+      }
+    });
+
+    it('should handle activation failure gracefully', async () => {
+      // Initialize the bot
+      await initializeTelegramClientBot('test-token', true);
+
+      const mockInactiveClients = [
+        {
+          client_id: 'INACTIVE_TEST',
+          nama: 'Inactive Test Client',
+          client_type: 'ORG',
+          client_status: false,
+        }
+      ];
+      
+      mockFindAllInactiveClients.mockResolvedValue(mockInactiveClients);
+
+      // Mock failed status toggle
+      mockToggleClientStatus.mockRejectedValue(new Error('Database error'));
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          
+          // Select menu 7
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Select the first inactive client
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '1',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Send activation command
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: 'AKTIFKAN',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Verify error message was sent
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const errorMsg = calls.find(call => 
+            call[1] && call[1].includes('Terjadi kesalahan')
+          );
+          
+          expect(errorMsg).toBeDefined();
+        }
+      }
+    });
+
+    it('should handle back command from status confirmation', async () => {
+      // Initialize the bot
+      await initializeTelegramClientBot('test-token', true);
+
+      const mockInactiveClients = [
+        {
+          client_id: 'INACTIVE_TEST',
+          nama: 'Inactive Test Client',
+          client_type: 'ORG',
+          client_status: false,
+        }
+      ];
+      
+      mockFindAllInactiveClients.mockResolvedValue(mockInactiveClients);
+
+      const menuHandler = mockOnText.mock.calls.find(call => 
+        call[0].toString().includes('menu')
+      );
+      
+      if (menuHandler) {
+        const handlerFn = menuHandler[1];
+        const mockMsg = {
+          chat: { id: 12345, type: 'private' },
+          text: '/menu',
+        };
+
+        await handlerFn(mockMsg);
+
+        const messageHandler = mockOn.mock.calls.find(call => call[0] === 'message');
+        
+        if (messageHandler) {
+          const msgHandlerFn = messageHandler[1];
+          
+          // Select menu 7
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '7',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Select the first inactive client
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: '1',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Send back command
+          await msgHandlerFn({
+            chat: { id: 12345, type: 'private' },
+            text: 'KEMBALI',
+            from: { id: 1, first_name: 'Test' }
+          });
+
+          // Verify we went back to the list (no activation call)
+          expect(mockToggleClientStatus).not.toHaveBeenCalled();
+          
+          // Verify the inactive client list was shown again
+          const calls = mockSendMessage.mock.calls.filter(call => call[0] === 12345);
+          const listMsg = calls.find(call => 
+            call[1] && call[1].includes('Kelola Client Tidak Aktif')
+          );
+          
+          expect(listMsg).toBeDefined();
         }
       }
     });

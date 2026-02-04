@@ -95,3 +95,8 @@ export async function getClientSummary(client_id) {
     total_tiktok_comments: tiktokComments,
   };
 }
+
+// Toggle client status (activate/deactivate)
+export const toggleClientStatus = async (client_id, newStatus) => {
+  return await clientModel.updateClientStatus(client_id, newStatus);
+};
