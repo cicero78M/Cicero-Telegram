@@ -17,10 +17,8 @@ let clientBot = null;
 let isInitialized = false;
 // Store user sessions for client selection and menu navigation
 const userSessions = new Map();
-// Default client ID when no clients are available
+// Default client ID and name when no clients are available
 const DEFAULT_CLIENT_ID = 'DITBINMAS';
-// Default client name for display
-const DEFAULT_CLIENT_NAME = 'DITBINMAS';
 // Number emojis for displaying client selection menu (supports up to 10 clients)
 const NUMBER_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 // Items per page for client list pagination
@@ -148,7 +146,7 @@ function setupCommandHandlers() {
     if (!session || !session.selectedClientId) {
       userSessions.set(chatId, {
         selectedClientId: DEFAULT_CLIENT_ID,
-        clientName: DEFAULT_CLIENT_NAME,
+        clientName: DEFAULT_CLIENT_ID,
         step: 'menu'
       });
       console.log(`[Telegram Client Bot] Initialized session with default client ${DEFAULT_CLIENT_ID} for chat ${chatId}`);
@@ -617,7 +615,7 @@ async function handleMenuSelection(chatId, menuNumber, from) {
       // Initialize with default client if no session exists
       userSessions.set(chatId, {
         selectedClientId: DEFAULT_CLIENT_ID,
-        clientName: DEFAULT_CLIENT_NAME,
+        clientName: DEFAULT_CLIENT_ID,
         step: 'menu'
       });
       clientId = DEFAULT_CLIENT_ID;
