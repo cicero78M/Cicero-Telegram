@@ -8,7 +8,8 @@
 
 import { 
   findClientById, 
-  getClientSummary
+  getClientSummary,
+  updateClient
 } from "../../service/clientService.js";
 import { getGreeting, formatNama } from "../../utils/utilsHelper.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";
@@ -234,6 +235,166 @@ async function handleClientInfo(clientId) {
 }
 
 /**
+ * Handle Update Data Client - Show field selection menu (2.1.1)
+ * Returns menu for selecting which field to update
+ */
+async function handleUpdateClientFieldSelection(clientId, clientLabel) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return `❌ Client dengan ID ${clientId} tidak ditemukan.`;
+    }
+
+    return `✏️ *Update Data Client*\n` +
+      `Client: ${clientLabel}\n\n` +
+      `Pilih field yang ingin diupdate:\n\n` +
+      `1️⃣ *Nama Client*\n` +
+      `   Saat ini: ${client.nama || '-'}\n\n` +
+      `2️⃣ *Instagram Username*\n` +
+      `   Saat ini: ${client.client_insta || '-'}\n\n` +
+      `3️⃣ *TikTok Username*\n` +
+      `   Saat ini: ${client.client_tiktok || '-'}\n\n` +
+      `4️⃣ *Client Group*\n` +
+      `   Saat ini: ${client.client_group || '-'}\n\n` +
+      `5️⃣ *Client Operator (WA)*\n` +
+      `   Saat ini: ${client.client_operator || '-'}\n\n` +
+      `6️⃣ *Client Super Admin (WA)*\n` +
+      `   Saat ini: ${client.client_super || '-'}\n\n` +
+      `Ketik nomor field (1-6) atau /menu untuk kembali.`;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error in field selection:', error);
+    return `❌ Gagal memuat data client: ${error.message}`;
+  }
+}
+
+/**
+ * Handle client field update prompt
+ * Returns prompt message asking for new value
+ */
+function handleClientFieldUpdatePrompt(fieldNumber, clientLabel, currentValue) {
+  const fieldNames = {
+    '1': { field: 'nama', label: 'Nama Client', hint: 'Contoh: DITINTELKAM' },
+    '2': { field: 'client_insta', label: 'Instagram Username', hint: 'Contoh: polri_official atau kosongkan dengan tanda -' },
+    '3': { field: 'client_tiktok', label: 'TikTok Username', hint: 'Contoh: @polri atau kosongkan dengan tanda -' },
+    '4': { field: 'client_group', label: 'Client Group', hint: 'Contoh: MABES atau kosongkan dengan tanda -' },
+    '5': { field: 'client_operator', label: 'Client Operator (WA)', hint: 'Contoh: 628123456789 atau kosongkan dengan tanda -' },
+    '6': { field: 'client_super', label: 'Client Super Admin (WA)', hint: 'Contoh: 628123456789 atau kosongkan dengan tanda -' }
+  };
+
+  const fieldInfo = fieldNames[fieldNumber];
+  if (!fieldInfo) {
+    return `❌ Field tidak valid.`;
+  }
+
+  return `✏️ *Update ${fieldInfo.label}*\n` +
+    `Client: ${clientLabel}\n\n` +
+    `Nilai saat ini: ${currentValue || '-'}\n\n` +
+    `Masukkan nilai baru untuk ${fieldInfo.label}:\n` +
+    `${fieldInfo.hint}\n\n` +
+    `Ketik /menu untuk membatalkan.`;
+}
+
+/**
+ * Process client field update
+ * Validates and updates the specified field
+ */
+async function processClientFieldUpdate(clientId, fieldNumber, newValue) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return { success: false, message: `❌ Client dengan ID ${clientId} tidak ditemukan.` };
+    }
+
+    // Map field numbers to database columns
+    const fieldMapping = {
+      '1': 'nama',
+      '2': 'client_insta',
+      '3': 'client_tiktok',
+      '4': 'client_group',
+      '5': 'client_operator',
+      '6': 'client_super'
+    };
+
+    const fieldName = fieldMapping[fieldNumber];
+    if (!fieldName) {
+      return { success: false, message: `❌ Field tidak valid.` };
+    }
+
+    // Clean the new value
+    const cleanValue = newValue.trim();
+    
+    // Handle empty value (user wants to clear the field)
+    let updateValue = cleanValue;
+    if (cleanValue === '-' || cleanValue === '') {
+      updateValue = '';
+    }
+
+    // Special validation for specific fields
+    if (fieldName === 'client_operator' || fieldName === 'client_super') {
+      // Validate WhatsApp number format if not empty
+      if (updateValue && updateValue !== '') {
+        // Remove non-digit characters
+        const digitsOnly = updateValue.replace(/\D/g, '');
+        if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+          return { 
+            success: false, 
+            message: `❌ Format nomor WhatsApp tidak valid. Nomor harus 10-15 digit.` 
+          };
+        }
+        // Normalize to start with 62
+        if (digitsOnly.startsWith('0')) {
+          updateValue = '62' + digitsOnly.slice(1);
+        } else if (!digitsOnly.startsWith('62')) {
+          updateValue = '62' + digitsOnly;
+        } else {
+          updateValue = digitsOnly;
+        }
+      }
+    }
+
+    // Prepare update data
+    const updateData = { [fieldName]: updateValue };
+
+    // Perform the update
+    const updatedClient = await updateClient(clientId, updateData);
+    
+    if (!updatedClient) {
+      return { 
+        success: false, 
+        message: `❌ Gagal mengupdate client. Client tidak ditemukan.` 
+      };
+    }
+
+    // Get field label for success message
+    const fieldLabels = {
+      'nama': 'Nama Client',
+      'client_insta': 'Instagram Username',
+      'client_tiktok': 'TikTok Username',
+      'client_group': 'Client Group',
+      'client_operator': 'Client Operator',
+      'client_super': 'Client Super Admin'
+    };
+
+    const displayValue = updateValue || '(kosong)';
+    
+    return { 
+      success: true, 
+      message: `✅ *Update Berhasil*\n\n` +
+        `Client: ${client.nama || clientId}\n` +
+        `Field: ${fieldLabels[fieldName]}\n` +
+        `Nilai baru: ${displayValue}\n\n` +
+        `Data client telah diperbarui.`
+    };
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error updating client:', error);
+    return { 
+      success: false, 
+      message: `❌ Terjadi kesalahan saat mengupdate client: ${error.message}` 
+    };
+  }
+}
+
+/**
  * Handle Kelola User submenu (2.2)
  */
 async function handleKelolaUserMenu(clientId, clientLabel) {
@@ -299,7 +460,7 @@ async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel
       }
       switch (subaction) {
         case "1": // Update Data Client
-          return `ℹ️ *Update Data Client*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+          return handleUpdateClientFieldSelection(clientId, clientLabel);
         case "2": // Hapus Client
           return `⚠️ *Hapus Client*\n\nPenghapusan client adalah operasi berbahaya yang memerlukan konfirmasi admin.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
         case "3": // Info Client
@@ -385,7 +546,10 @@ export const clientRequestTelegramHandlers = {
   handleClientInfo,
   handleHapusWAUserPrompt,
   handleBulkStatusPrompt,
-  handleRefreshAggregator
+  handleRefreshAggregator,
+  handleUpdateClientFieldSelection,
+  handleClientFieldUpdatePrompt,
+  processClientFieldUpdate
 };
 
 export default clientRequestTelegramHandlers;
