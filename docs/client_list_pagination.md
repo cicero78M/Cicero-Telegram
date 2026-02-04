@@ -39,8 +39,10 @@ Navigasi:
 • Ketik *next* atau *n* untuk halaman berikutnya
 • Ketik nomor halaman (1-4) untuk langsung ke halaman tersebut
 
-Balas dengan *angka* (1-10) atau *Client ID* yang tertera.
-Ketik *kembali* untuk memilih tipe client lain.
+*Pilih Client:*
+• Ketik angka emoji di atas (1-10)
+• Ketik Client ID lengkap untuk pilih langsung
+• Ketik *kembali* untuk memilih tipe client lain
 ```
 
 ## User Experience Improvements

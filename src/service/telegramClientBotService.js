@@ -372,10 +372,9 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       console.warn(`[Telegram Client Bot] Filtered out ${clients.length - validClients.length} invalid clients`);
     }
     
-    // Get current page from parameter or default to 1
-    const currentPage = page;
+    // Pagination logic using page parameter
     const totalPages = Math.ceil(validClients.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
     const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, validClients.length);
     const pageClients = validClients.slice(startIndex, endIndex);
     
@@ -394,12 +393,12 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
     
     // Add pagination information if there are multiple pages
     if (totalPages > 1) {
-      clientMenu += `\n📄 Halaman ${currentPage} dari ${totalPages} (Total: ${validClients.length} client)\n`;
+      clientMenu += `\n📄 Halaman ${page} dari ${totalPages} (Total: ${validClients.length} client)\n`;
       clientMenu += '\nNavigasi:\n';
-      if (currentPage > 1) {
+      if (page > 1) {
         clientMenu += '• Ketik *prev* atau *p* untuk halaman sebelumnya\n';
       }
-      if (currentPage < totalPages) {
+      if (page < totalPages) {
         clientMenu += '• Ketik *next* atau *n* untuk halaman berikutnya\n';
       }
       if (totalPages > 2) {
@@ -417,7 +416,7 @@ async function showClientSelection(chatId, clientType = null, page = 1) {
       step: 'choose_client',
       clients: validClients,
       clientType: clientType,
-      currentPage: currentPage,
+      currentPage: page,
       totalPages: totalPages
     });
     
