@@ -21,8 +21,9 @@ export function createSendMessageWrapper(bot, nativeSendMessage, botName) {
         console.log(`[Telegram ${botName}] Splitting long message into ${chunks.length} chunks`);
         
         // Send all chunks sequentially
+        let lastResult;
         for (let i = 0; i < chunks.length; i++) {
-          await nativeSendMessage.call(bot, chatId, chunks[i], options);
+          lastResult = await nativeSendMessage.call(bot, chatId, chunks[i], options);
           
           // Add a small delay between chunks to avoid rate limiting
           if (i < chunks.length - 1) {
@@ -30,8 +31,8 @@ export function createSendMessageWrapper(bot, nativeSendMessage, botName) {
           }
         }
         
-        // Return the last send result
-        return;
+        // Return the result from the last chunk
+        return lastResult;
       }
       
       return await nativeSendMessage.call(bot, chatId, message, options);

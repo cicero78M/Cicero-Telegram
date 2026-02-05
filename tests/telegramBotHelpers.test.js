@@ -160,10 +160,9 @@ describe('splitMessage', () => {
 
   it('should handle real-world attendance report scenario', () => {
     // Simulate a large attendance report with many users
-    const users = [];
-    for (let i = 0; i < 1000; i++) {
-      users.push(`${i + 1}. User ${i + 1} - Division ${i % 10} - Status: Active`);
-    }
+    const users = Array.from({ length: 1000 }, (_, i) => 
+      `${i + 1}. User ${i + 1} - Division ${i % 10} - Status: Active`
+    );
     const message = 'Attendance Report\n\n' + users.join('\n');
     
     const result = splitMessage(message, 4000);
