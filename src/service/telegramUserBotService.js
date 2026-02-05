@@ -3,6 +3,7 @@ import { userMenuHandlers } from '../handler/menu/userMenuHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
 import { createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import { normalizeWhatsappNumber } from '../utils/phoneHelper.js';
 
 let userBot = null;
 let isInitialized = false;
@@ -82,8 +83,10 @@ function setupCommandHandlers() {
         `Halo, *${escapeMarkdown(linkedUser.nama || 'User')}*!\n\n` +
         'Akun Telegram Anda sudah ditautkan.\n\n' +
         '*Perintah yang tersedia:*\n' +
-        '/menu - Tampilkan menu user\n' +
-        '/help - Tampilkan bantuan';
+        '/profile - Lihat profil Anda\n' +
+        '/update - Update data (Instagram, TikTok, nama, email, phone)\n' +
+        '/menu - Menu interaktif\n' +
+        '/help - Bantuan lengkap';
       
       await userBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
     } else {
@@ -118,16 +121,36 @@ function setupCommandHandlers() {
     let helpMessage;
     if (linkedUser) {
       helpMessage = 
-        '📖 *Bantuan Bot User Cicero*\n\n' +
-        '*Perintah yang tersedia:*\n' +
-        '/start - Tampilkan pesan selamat datang\n' +
-        '/menu - Tampilkan menu user untuk mengelola data\n' +
-        '/help - Tampilkan pesan bantuan ini\n\n' +
-        '*Cara penggunaan:*\n' +
-        '1. Gunakan /menu untuk melihat menu yang tersedia\n' +
-        '2. Pilih menu yang ingin diakses\n' +
-        '3. Ikuti instruksi dari bot\n\n' +
-        'Bot ini hanya merespons di *chat private*.';
+        '🤖 *CARA UPDATE DATA DI BOT TELEGRAM* 🤖\n\n' +
+        'Halo! Ini cara update data kamu:\n\n' +
+        '*1. Update Instagram*\n' +
+        '   `/update instagram @username`\n' +
+        '   Contoh: `/update instagram @jokowi`\n' +
+        '   Contoh: `/update instagram @raffinagita1717`\n\n' +
+        '*2. Update TikTok*\n' +
+        '   `/update tiktok @username`\n' +
+        '   Contoh: `/update tiktok @jokowi`\n' +
+        '   Contoh: `/update tiktok @awkarin`\n\n' +
+        '*3. Update Nama*\n' +
+        '   `/update nama Nama Lengkap`\n' +
+        '   Contoh: `/update nama Budi Santoso`\n\n' +
+        '*4. Update Email*\n' +
+        '   `/update email nama@email.com`\n' +
+        '   Contoh: `/update email budi@gmail.com`\n\n' +
+        '*5. Update Telepon*\n' +
+        '   `/update phone +628xxxxxxxxx`\n' +
+        '   Contoh: `/update phone +628123456789`\n\n' +
+        '*✅ CEK DATA SAAT INI*\n' +
+        '   Ketik: `/profile`\n\n' +
+        '*💡 TIPS*\n' +
+        '   • Username Instagram/TikTok pakai @\n' +
+        '   • Nomor telepon pakai \\+62\n' +
+        '   • Ketik `/help` untuk bantuan\n\n' +
+        '*Perintah lainnya:*\n' +
+        '/start - Pesan selamat datang\n' +
+        '/menu - Menu interaktif\n' +
+        '/profile - Lihat profil Anda\n' +
+        '/help - Bantuan ini';
     } else {
       helpMessage = 
         '📖 *Bantuan Bot User Cicero*\n\n' +
@@ -148,6 +171,83 @@ function setupCommandHandlers() {
     }
     
     await userBot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+  });
+
+  // /profile command
+  userBot.onText(/\/profile/, async (msg) => {
+    const chatId = msg.chat.id;
+    const chatType = msg.chat.type;
+    
+    console.log(`[Telegram User Bot] /profile command from chat ${chatId} (type: ${chatType})`);
+    
+    if (chatType !== 'private') {
+      await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    // Check if user is linked
+    const linkedUser = await userModel.findUserByTelegramChatId(chatId);
+    if (!linkedUser) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ Akun Telegram Anda belum ditautkan dengan akun pengguna.\n\n' +
+        'Untuk menggunakan bot ini, silakan tautkan akun Anda dengan perintah:\n' +
+        '`/link NRP_ANDA`\n\n' +
+        'Contoh: `/link 081235114745`',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    try {
+      // Get fresh user data
+      const user = await userModel.findUserById(linkedUser.user_id);
+      
+      if (!user) {
+        await userBot.sendMessage(chatId, '❌ Data pengguna tidak ditemukan.');
+        return;
+      }
+      
+      const polresName = escapeMarkdown(user.client_name || user.client_id || '-');
+      const nama = escapeMarkdown(user.nama || '-');
+      const title = escapeMarkdown(user.title || '-');
+      const userId = escapeMarkdown(user.user_id || '-');
+      const divisi = escapeMarkdown(user.divisi || '-');
+      const jabatan = escapeMarkdown(user.jabatan || '-');
+      const desa = escapeMarkdown(user.desa || '-');
+      const insta = user.insta ? '@' + escapeMarkdown(user.insta.replace(/^@/, '')) : '-';
+      const tiktok = user.tiktok ? '@' + escapeMarkdown(user.tiktok.replace(/^@/, '')) : '-';
+      const whatsapp = escapeMarkdown(user.whatsapp || '-');
+      const email = escapeMarkdown(user.email || '-');
+      const status = (user.status === true || user.status === 'true') ? '🟢 AKTIF' : '🔴 NONAKTIF';
+      
+      const profileMessage = [
+        '👤 *PROFIL ANDA*',
+        '',
+        `*Nama Polres*: ${polresName}`,
+        `*Nama*       : ${nama}`,
+        `*Pangkat*    : ${title}`,
+        `*NRP/NIP*    : ${userId}`,
+        `*Satfung*    : ${divisi}`,
+        `*Jabatan*    : ${jabatan}`,
+        ...(user.ditbinmas ? [`*Desa Binaan* : ${desa}`] : []),
+        `*Instagram*  : ${insta}`,
+        `*TikTok*     : ${tiktok}`,
+        `*WhatsApp*   : ${whatsapp}`,
+        `*Email*      : ${email}`,
+        `*Status*     : ${status}`,
+        '',
+        '💡 Untuk mengupdate data, gunakan `/update` atau `/help`'
+      ].join('\n');
+      
+      await userBot.sendMessage(chatId, profileMessage, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('[Telegram User Bot] Error in /profile command:', error);
+      await userBot.sendMessage(
+        chatId,
+        '❌ Terjadi kesalahan saat menampilkan profil. Silakan coba lagi nanti.'
+      );
+    }
   });
 
   // /menu command
@@ -394,6 +494,249 @@ function setupCommandHandlers() {
       await userBot.sendMessage(
         chatId,
         '❌ Terjadi kesalahan saat memproses persetujuan. Silakan coba lagi nanti.'
+      );
+    }
+  });
+
+  // /update command
+  userBot.onText(/\/update(?:\s+(\w+)(?:\s+(.+))?)?/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const chatType = msg.chat.type;
+    const field = match[1]?.toLowerCase();
+    const value = match[2]?.trim();
+    
+    console.log(`[Telegram User Bot] /update command from chat ${chatId} with field: ${field}, value: ${value}`);
+    
+    if (chatType !== 'private') {
+      await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+    
+    // Check if user is linked
+    const linkedUser = await userModel.findUserByTelegramChatId(chatId);
+    if (!linkedUser) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ Akun Telegram Anda belum ditautkan dengan akun pengguna.\n\n' +
+        'Untuk menggunakan bot ini, silakan tautkan akun Anda dengan perintah:\n' +
+        '`/link NRP_ANDA`\n\n' +
+        'Contoh: `/link 081235114745`',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    if (!field) {
+      await userBot.sendMessage(
+        chatId,
+        '⚠️ *Cara menggunakan perintah /update:*\n\n' +
+        '*Format:* `/update <field> <value>`\n\n' +
+        '*Field yang tersedia:*\n' +
+        '• `instagram` - Update Instagram\n' +
+        '• `tiktok` - Update TikTok\n' +
+        '• `nama` - Update nama lengkap\n' +
+        '• `email` - Update email\n' +
+        '• `phone` - Update nomor telepon\n\n' +
+        '*Contoh:*\n' +
+        '`/update instagram @jokowi`\n' +
+        '`/update tiktok @awkarin`\n' +
+        '`/update nama Budi Santoso`\n' +
+        '`/update email budi@gmail.com`\n' +
+        '`/update phone +628123456789`\n\n' +
+        'Ketik `/help` untuk bantuan lengkap.',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    if (!value) {
+      await userBot.sendMessage(
+        chatId,
+        `⚠️ Nilai untuk field *${field}* tidak boleh kosong.\n\n` +
+        `Contoh: \`/update ${field} nilai_baru\`\n\n` +
+        'Ketik `/help` untuk bantuan lengkap.',
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+    
+    try {
+      const userId = linkedUser.user_id;
+      let dbField = field;
+      let processedValue = value;
+      let displayValue = value;
+      
+      // Handle different field types
+      switch (field) {
+        case 'instagram':
+        case 'insta': {
+          dbField = 'insta';
+          // Extract username from Instagram URL or handle
+          const igMatch = processedValue.match(
+            /^(?:https?:\/\/(?:www\.)?instagram\.com\/)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
+          );
+          if (!igMatch) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Format Instagram tidak valid!\n\n' +
+              '*Format yang diterima:*\n' +
+              '• `@username`\n' +
+              '• `username`\n' +
+              '• `https://www.instagram.com/username`\n\n' +
+              '*Contoh:*\n' +
+              '`/update instagram @jokowi`\n' +
+              '`/update instagram raffinagita1717`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          processedValue = igMatch[1].toLowerCase();
+          displayValue = '@' + processedValue;
+          
+          // Check if Instagram is already taken
+          const existingIg = await userModel.findUserByInsta(processedValue);
+          if (existingIg && existingIg.user_id !== userId) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Akun Instagram tersebut sudah terdaftar pada pengguna lain.'
+            );
+            return;
+          }
+          break;
+        }
+        
+        case 'tiktok': {
+          // Extract username from TikTok URL or handle
+          const ttMatch = processedValue.match(
+            /^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
+          );
+          if (!ttMatch) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Format TikTok tidak valid!\n\n' +
+              '*Format yang diterima:*\n' +
+              '• `@username`\n' +
+              '• `username`\n' +
+              '• `https://www.tiktok.com/@username`\n\n' +
+              '*Contoh:*\n' +
+              '`/update tiktok @jokowi`\n' +
+              '`/update tiktok awkarin`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          processedValue = ttMatch[1].toLowerCase();
+          displayValue = '@' + processedValue;
+          
+          // Check if TikTok is already taken
+          const existingTt = await userModel.findUserByTiktok(processedValue);
+          if (existingTt && existingTt.user_id !== userId) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Akun TikTok tersebut sudah terdaftar pada pengguna lain.'
+            );
+            return;
+          }
+          break;
+        }
+        
+        case 'nama':
+        case 'name': {
+          dbField = 'nama';
+          // Validate name (should have at least 2 characters)
+          if (processedValue.length < 2) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Nama harus memiliki minimal 2 karakter.\n\n' +
+              '*Contoh:*\n' +
+              '`/update nama Budi Santoso`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          processedValue = processedValue.toUpperCase();
+          displayValue = processedValue;
+          break;
+        }
+        
+        case 'email': {
+          // Validate email format
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(processedValue)) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Format email tidak valid!\n\n' +
+              '*Contoh:*\n' +
+              '`/update email budi@gmail.com`\n' +
+              '`/update email nama.lengkap@domain.co.id`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          break;
+        }
+        
+        case 'phone':
+        case 'telepon':
+        case 'whatsapp':
+        case 'wa': {
+          dbField = 'whatsapp';
+          // Normalize phone number
+          try {
+            processedValue = normalizeWhatsappNumber(processedValue);
+            displayValue = processedValue;
+          } catch (error) {
+            await userBot.sendMessage(
+              chatId,
+              '❌ Format nomor telepon tidak valid!\n\n' +
+              '*Format yang diterima:*\n' +
+              '• Harus dimulai dengan \\+62\n' +
+              '• Diikuti minimal 9 digit angka\n\n' +
+              '*Contoh:*\n' +
+              '`/update phone +628123456789`\n' +
+              '`/update phone +6281234567890`',
+              { parse_mode: 'Markdown' }
+            );
+            return;
+          }
+          break;
+        }
+        
+        default: {
+          await userBot.sendMessage(
+            chatId,
+            '❌ Field tidak dikenali!\n\n' +
+            '*Field yang tersedia:*\n' +
+            '• `instagram` - Update Instagram\n' +
+            '• `tiktok` - Update TikTok\n' +
+            '• `nama` - Update nama lengkap\n' +
+            '• `email` - Update email\n' +
+            '• `phone` - Update nomor telepon\n\n' +
+            'Ketik `/help` untuk bantuan lengkap.',
+            { parse_mode: 'Markdown' }
+          );
+          return;
+        }
+      }
+      
+      // Update the field
+      await userModel.updateUserField(userId, dbField, processedValue);
+      
+      await userBot.sendMessage(
+        chatId,
+        `✅ *Berhasil mengupdate ${field}!*\n\n` +
+        `*Nilai baru:* ${escapeMarkdown(displayValue)}\n\n` +
+        'Ketik `/profile` untuk melihat data terbaru Anda.',
+        { parse_mode: 'Markdown' }
+      );
+      
+      console.log(`[Telegram User Bot] User ${userId} updated ${dbField} to ${processedValue}`);
+      
+    } catch (error) {
+      console.error('[Telegram User Bot] Error in /update command:', error);
+      await userBot.sendMessage(
+        chatId,
+        '❌ Terjadi kesalahan saat mengupdate data. Silakan coba lagi nanti.'
       );
     }
   });
