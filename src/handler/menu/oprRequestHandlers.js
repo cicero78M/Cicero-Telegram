@@ -40,6 +40,29 @@ function buildSuperAdminPatterns(numbers) {
   return numbers.map((number) => `(^|\\D)${number}(\\D|$)`);
 }
 
+async function isSuperAdmin(chatId, pool) {
+  const candidates = normalizeAccessNumbers(chatId);
+  if (!candidates.length) {
+    return false;
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT client_id
+       FROM clients
+       WHERE client_super IS NOT NULL
+         AND client_super <> ''
+         AND client_super ~ ANY($1::text[])
+       LIMIT 1`,
+      [buildSuperAdminPatterns(candidates)]
+    );
+    return rows.length > 0;
+  } catch (err) {
+    console.error('Error checking super admin status:', err);
+    return false;
+  }
+}
+
 async function resolveClientProfile(session, chatId, pool) {
   if (session.selected_client_id) {
     const { rows } = await pool.query(
@@ -377,7 +400,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         clean();
         const client = await ensureUserMenuAccess(session, chatId, waClient, pool);
         if (!client) {
-          if (isAdminWhatsApp(chatId)) {
+          if (await isSuperAdmin(chatId, pool)) {
             delete session.selected_client_id;
           }
           session.step = "main";
@@ -397,7 +420,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         clean();
         const client = await ensureAmplifyMenuAccess(session, chatId, waClient, pool);
         if (!client) {
-          if (isAdminWhatsApp(chatId)) {
+          if (await isSuperAdmin(chatId, pool)) {
             delete session.selected_client_id;
           }
           session.step = "main";
@@ -422,7 +445,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
           pool
         );
         if (!engagementAccess) {
-          if (isAdminWhatsApp(chatId)) {
+          if (await isSuperAdmin(chatId, pool)) {
             delete session.selected_client_id;
           }
           session.step = "main";
@@ -502,7 +525,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^4$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "cekUser_chooseClient";
         return oprRequestHandlers.cekUser_chooseClient(
           session,
@@ -522,7 +545,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^5$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiReg_chooseClient";
         return oprRequestHandlers.absensiReg_chooseClient(
           session,
@@ -538,7 +561,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^6$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiUpdateData_chooseClient";
         return oprRequestHandlers.absensiUpdateData_chooseClient(
           session,
@@ -587,7 +610,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         { platform: "instagram" }
       );
       if (!access) {
-        if (isAdminWhatsApp(chatId)) {
+        if (await isSuperAdmin(chatId, pool)) {
           delete session.selected_client_id;
         }
         session.step = "main";
@@ -613,7 +636,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         { platform: "tiktok" }
       );
       if (!access) {
-        if (isAdminWhatsApp(chatId)) {
+        if (await isSuperAdmin(chatId, pool)) {
           delete session.selected_client_id;
         }
         session.step = "main";
@@ -699,7 +722,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^1$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "updateTugas_chooseClient";
         return oprRequestHandlers.updateTugas_chooseClient(
           session,
@@ -795,7 +818,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^1$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLink_chooseClient";
         return oprRequestHandlers.rekapLink_chooseClient(
           session,
@@ -811,7 +834,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^2$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkKemarin_chooseClient";
         return oprRequestHandlers.rekapLinkKemarin_chooseClient(
           session,
@@ -827,7 +850,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^3$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkPerPost_chooseClient";
         return oprRequestHandlers.rekapLinkPerPost_chooseClient(
           session,
@@ -842,7 +865,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^4$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiLink_chooseClient";
         return oprRequestHandlers.absensiLink_chooseClient(
           session,
@@ -888,7 +911,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^1$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkKhusus_chooseClient";
         return oprRequestHandlers.rekapLinkKhusus_chooseClient(
           session,
@@ -910,7 +933,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^2$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkKhususPerPost_chooseClient";
         return oprRequestHandlers.rekapLinkKhususPerPost_chooseClient(
           session,
@@ -932,7 +955,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     if (/^3$/i.test(text.trim())) {
       clean();
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiLinkKhusus_chooseClient";
         return oprRequestHandlers.absensiLinkKhusus_chooseClient(
           session,
@@ -1158,7 +1181,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   rekapLink: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLink_chooseClient";
         return oprRequestHandlers.rekapLink_chooseClient(session, chatId, text, waClient, pool);
       }
@@ -1251,7 +1274,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   rekapLinkKemarin: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkKemarin_chooseClient";
         return oprRequestHandlers.rekapLinkKemarin_chooseClient(session, chatId, text, waClient, pool, userModel);
       }
@@ -1412,7 +1435,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   rekapLinkPerPost: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkPerPost_chooseClient";
         return oprRequestHandlers.rekapLinkPerPost_chooseClient(
           session,
@@ -1534,7 +1557,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   rekapLinkKhususPerPost: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "rekapLinkKhususPerPost_chooseClient";
         return oprRequestHandlers.rekapLinkKhususPerPost_chooseClient(
           session,
@@ -1649,7 +1672,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   updateTugas: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "updateTugas_chooseClient";
         return oprRequestHandlers.updateTugas_chooseClient(session, chatId, text, waClient, pool);
       }
@@ -2320,7 +2343,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   absensiLink_submenu: async (session, chatId, text, waClient, pool, userModel) => {
     let clientId = session.absensi_client_id || (await resolveClientId(session, chatId, pool));
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiLink_chooseClient";
         return oprRequestHandlers.absensiLink_chooseClient(session, chatId, text, waClient, pool);
       }
@@ -2457,7 +2480,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   absensiReg_submenu: async (session, chatId, text, waClient, pool, userModel) => {
     const clientId = session.absensi_reg_client_id || (await resolveClientId(session, chatId, pool));
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiReg_chooseClient";
         return oprRequestHandlers.absensiReg_chooseClient(session, chatId, text, waClient, pool);
       }
@@ -2519,7 +2542,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
     const clientId =
       session.absensi_update_client_id || (await resolveClientId(session, chatId, pool));
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "absensiUpdateData_chooseClient";
         return oprRequestHandlers.absensiUpdateData_chooseClient(
           session,
@@ -2746,7 +2769,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
     const nrp = text.trim().replace(/[^0-9a-zA-Z]/g, "");
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
-      if (isAdminWhatsApp(chatId)) {
+      if (await isSuperAdmin(chatId, pool)) {
         session.step = "cekUser_chooseClient";
         return oprRequestHandlers.cekUser_chooseClient(session, chatId, text, waClient, pool);
       }
