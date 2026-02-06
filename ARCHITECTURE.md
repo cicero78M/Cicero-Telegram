@@ -193,15 +193,10 @@ The application entry point initializes four independent Telegram bots:
 - **`clientContactRepository.js`**: Contact-specific queries
 - Abstraction over raw SQL queries
 
-#### `/src/middleware/` - Middleware Layer
-- **`debugHandler.js`**: Debug logging middleware
-- Request/response interceptors
-
 #### `/src/utils/` - Utility Layer (20+ utilities)
 - **`logger.js`**: Winston-based structured logging (Asia/Jakarta timezone)
-- **`response.js`**: Standardized API response formatting
+- **`debugHandler.js`**: Debug logging utility for console output
 - **`crypt.js`**: CryptoJS AES encryption/decryption
-- **`requestHash.js`**: Redis-based request deduplication
 - **`telegramBotHelpers.js`**: Telegram message formatting
 - **`excelHelper.js`**: XLSX report generation
 - **`constants.js`**: Application-wide constants

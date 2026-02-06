@@ -87,13 +87,10 @@ Cicero-Telegram/
 │   ├── repository/              # Database query helpers
 │   │   ├── db.js               # Generic query wrapper
 │   │   └── clientContactRepository.js
-│   ├── middleware/              # Express middleware
-│   │   └── debugHandler.js     # Debug logging middleware
 │   ├── utils/                   # Utility functions (20+ utilities)
 │   │   ├── logger.js           # Winston-based logging
-│   │   ├── response.js         # Response formatter
+│   │   ├── debugHandler.js     # Debug logging utility
 │   │   ├── crypt.js            # CryptoJS encryption
-│   │   ├── requestHash.js      # Request deduplication
 │   │   ├── telegramBotHelpers.js # Telegram formatting
 │   │   ├── excelHelper.js      # XLSX generation
 │   │   └── [14+ more utils]    # Various helpers
