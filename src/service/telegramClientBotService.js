@@ -259,6 +259,12 @@ function setupMessageHandlers() {
       return;
     }
     
+    // Check if user is confirming client deactivation
+    if (session && session.step === 'confirm_client_deactivation') {
+      await handleClientDeactivationConfirmation(chatId, text.trim().toUpperCase(), msg.from);
+      return;
+    }
+    
     // Check if it's a menu number
     if (text && /^\d+$/.test(text.trim())) {
       await handleMenuSelection(chatId, text.trim(), msg.from);
@@ -1355,6 +1361,29 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
       return;
     }
     
+    // Special handling for Nonaktifkan Client (2.1.5)
+    if (submenu === '1' && subaction === '5') {
+      // Set state to deactivation confirmation
+      userSessions.set(chatId, {
+        ...session,
+        step: 'confirm_client_deactivation'
+      });
+      
+      // Format client label using helper
+      const clientLabel = formatClientLabel(clientId, clientName);
+      
+      // Call the handler to show deactivation confirmation prompt
+      const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
+        submenu,
+        subaction,
+        clientId,
+        clientLabel
+      );
+      
+      await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+      return;
+    }
+    
     // Reset to menu mode after action for other subactions
     userSessions.set(chatId, {
       ...session,
@@ -1680,6 +1709,103 @@ async function handleUpdateStatusFieldConfirmation(chatId, confirmation, from) {
         ...session,
         step: 'menu',
         selectedStatusField: undefined
+      });
+    }
+    
+    await clientBot.sendMessage(
+      chatId,
+      `❌ Terjadi kesalahan: ${error.message}\n\nKetik /menu untuk kembali ke menu utama.`
+    );
+  }
+}
+
+/**
+ * Handle client deactivation confirmation
+ * @param {number} chatId - Telegram chat ID
+ * @param {string} text - User input text
+ * @param {object} from - Telegram user info
+ */
+async function handleClientDeactivationConfirmation(chatId, text, from) {
+  if (!clientBot) {
+    console.error('[Telegram Client Bot] Bot not initialized in handleClientDeactivationConfirmation');
+    return;
+  }
+  
+  try {
+    console.log(`[Telegram Client Bot] Processing deactivation confirmation for chat ${chatId}, input: "${text}"`);
+    
+    const session = userSessions.get(chatId);
+    if (!session || !session.selectedClientId) {
+      console.warn('[Telegram Client Bot] Session not found or no client selected for chat:', chatId);
+      await clientBot.sendMessage(chatId, '❌ Sesi tidak ditemukan. Silakan ketik /menu untuk memulai kembali.');
+      return;
+    }
+    
+    const clientId = session.selectedClientId;
+    const clientName = session.clientName || clientId;
+    // Input already normalized to uppercase by caller
+    const input = text.trim();
+    
+    // Handle "back" command
+    if (input === 'KEMBALI' || input === 'BACK') {
+      console.log('[Telegram Client Bot] User wants to cancel deactivation');
+      
+      // Reset session to menu mode
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu'
+      });
+      
+      await clientBot.sendMessage(
+        chatId,
+        '❌ Nonaktifkan client dibatalkan.\n\nKetik /menu untuk kembali ke menu utama.'
+      );
+      return;
+    }
+    
+    // Handle deactivation command
+    if (input === 'NONAKTIFKAN' || input === 'DEACTIVATE') {
+      console.log('[Telegram Client Bot] Attempting to deactivate client:', clientId);
+      
+      // Show processing message
+      await clientBot.sendMessage(chatId, '⏳ Sedang memproses nonaktifkan client...');
+      
+      // Format client label using helper
+      const clientLabel = formatClientLabel(clientId, clientName);
+      
+      // Process the deactivation
+      const result = await clientRequestTelegramHandlers.processClientDeactivation(
+        clientId,
+        clientLabel
+      );
+      
+      // Reset session to menu mode
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu'
+      });
+      
+      // Send result
+      await clientBot.sendMessage(chatId, result.message, { parse_mode: 'Markdown' });
+      
+      console.log(`[Telegram Client Bot] Deactivation result: ${result.success ? 'success' : 'failure'}`);
+    } else {
+      // Invalid confirmation
+      await clientBot.sendMessage(
+        chatId,
+        '❌ Konfirmasi tidak valid.\n\nKetik *NONAKTIFKAN* untuk konfirmasi atau *KEMBALI* untuk membatalkan.',
+        { parse_mode: 'Markdown' }
+      );
+    }
+  } catch (error) {
+    console.error('[Telegram Client Bot] Error handling deactivation confirmation:', error);
+    
+    // Reset session on error
+    const session = userSessions.get(chatId);
+    if (session) {
+      userSessions.set(chatId, {
+        ...session,
+        step: 'menu'
       });
     }
     

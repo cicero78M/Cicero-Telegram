@@ -9,7 +9,8 @@
 import { 
   findClientById, 
   getClientSummary,
-  updateClient
+  updateClient,
+  toggleClientStatus
 } from "../../service/clientService.js";
 import { getGreeting, formatNama, normalizeWhatsAppNumber } from "../../utils/utilsHelper.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";
@@ -210,7 +211,9 @@ async function handleKelolaClientMenu(clientId, clientLabel) {
     `   Tampilkan detail client\n\n` +
     `4️⃣ *Update Status Client*\n` +
     `   Perbarui status Instagram, TikTok, dan Amplifikasi\n\n` +
-    `Ketik nomor aksi (1-4) atau /menu untuk kembali.`;
+    `5️⃣ *Nonaktifkan Client*\n` +
+    `   Client tidak dapat digunakan untuk operasi.\n\n` +
+    `Ketik nomor aksi (1-5) atau /menu untuk kembali.`;
 }
 
 /**
@@ -588,6 +591,88 @@ async function handleRefreshAggregator() {
 }
 
 /**
+ * Handle Deactivate Client Prompt (2.1.5)
+ * Returns confirmation prompt for deactivating a client
+ */
+async function handleDeactivateClientPrompt(clientId, clientLabel) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return `❌ Client dengan ID ${clientId} tidak ditemukan.`;
+    }
+    
+    // Check if client is already inactive
+    if (!client.client_status) {
+      return `⚠️ *Client Sudah Tidak Aktif*\n\n` +
+        `Client ${clientLabel} sudah dalam status tidak aktif.\n\n` +
+        `Ketik /menu untuk kembali ke menu utama.`;
+    }
+    
+    return `⚠️ *Konfirmasi Nonaktifkan Client*\n\n` +
+      `Client: ${clientLabel}\n` +
+      `Status saat ini: Aktif ✅\n\n` +
+      `Apakah Anda yakin ingin menonaktifkan client ini?\n` +
+      `Client yang tidak aktif tidak dapat digunakan untuk operasi.\n\n` +
+      `Ketik *NONAKTIFKAN* untuk konfirmasi, atau ketik *KEMBALI* untuk membatalkan.`;
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error in deactivate prompt:', error);
+    return `❌ Gagal memuat data client: ${error.message}`;
+  }
+}
+
+/**
+ * Process client deactivation
+ * @param {string} clientId - Client ID to deactivate
+ * @param {string} clientLabel - Client label for display
+ * @returns {Promise<object>} Object with success flag and message
+ */
+async function processClientDeactivation(clientId, clientLabel) {
+  try {
+    const client = await findClientById(clientId);
+    if (!client) {
+      return {
+        success: false,
+        message: `❌ Client dengan ID ${clientId} tidak ditemukan.`
+      };
+    }
+    
+    // Check if client is already inactive
+    if (!client.client_status) {
+      return {
+        success: false,
+        message: `⚠️ Client ${clientLabel} sudah dalam status tidak aktif.`
+      };
+    }
+    
+    // Deactivate the client by setting status to false
+    const updatedClient = await toggleClientStatus(clientId, false);
+    
+    if (!updatedClient) {
+      return {
+        success: false,
+        message: `❌ Gagal menonaktifkan client. Silakan coba lagi.`
+      };
+    }
+    
+    return {
+      success: true,
+      message: `✅ *Client Berhasil Dinonaktifkan*\n\n` +
+        `Client: ${clientLabel}\n` +
+        `Status: Tidak Aktif ❌\n\n` +
+        `Client ini sekarang tidak dapat digunakan untuk operasi.\n` +
+        `Untuk mengaktifkan kembali, gunakan menu *Kelola Client Tidak Aktif* (menu 7).\n\n` +
+        `Ketik /menu untuk kembali ke menu utama.`
+    };
+  } catch (error) {
+    console.error('[ClientRequestTelegram] Error deactivating client:', error);
+    return {
+      success: false,
+      message: `❌ Terjadi kesalahan saat menonaktifkan client: ${error.message}`
+    };
+  }
+}
+
+/**
  * Handle submenu actions for Management Menu (menu 2)
  * @param {string} submenu - Submenu number (1-5)
  * @param {string} subaction - Optional sub-action within submenu
@@ -610,8 +695,10 @@ async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel
           return handleClientInfo(clientId);
         case "4": // Update Status Client
           return handleUpdateStatusClientMenu(clientId, clientLabel);
+        case "5": // Nonaktifkan Client
+          return handleDeactivateClientPrompt(clientId, clientLabel);
         default:
-          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-4).`;
+          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-5).`;
       }
     
     case "2": // Kelola User
@@ -697,7 +784,9 @@ export const clientRequestTelegramHandlers = {
   processClientFieldUpdate,
   handleUpdateStatusClientMenu,
   handleStatusFieldUpdatePrompt,
-  processStatusFieldUpdate
+  processStatusFieldUpdate,
+  handleDeactivateClientPrompt,
+  processClientDeactivation
 };
 
 // Export constants
