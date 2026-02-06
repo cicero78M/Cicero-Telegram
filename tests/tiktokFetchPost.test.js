@@ -32,7 +32,7 @@ describe('fetchAndStoreTiktokContent timezone handling', () => {
     jest.unstable_mockModule('../src/model/tiktokPostModel.js', () => ({
       upsertTiktokPosts: mockUpsert,
     }));
-    jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+    jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
       sendDebug: mockSendDebug,
     }));
     jest.unstable_mockModule('../src/service/tiktokApi.js', () => ({
@@ -174,7 +174,7 @@ describe('fetchAndStoreTiktokContent fallback handling', () => {
     jest.unstable_mockModule('../src/model/tiktokPostModel.js', () => ({
       upsertTiktokPosts: mockUpsert,
     }));
-    jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+    jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
       sendDebug: mockSendDebug,
     }));
     jest.unstable_mockModule('../src/service/tiktokApi.js', () => ({
@@ -243,7 +243,7 @@ describe('fetchAndStoreTiktokContent fallback handling', () => {
     jest.unstable_mockModule('../src/model/tiktokPostModel.js', () => ({
       upsertTiktokPosts: mockUpsert,
     }));
-    jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+    jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
       sendDebug: mockSendDebug,
     }));
     jest.unstable_mockModule('../src/service/tiktokApi.js', () => ({
@@ -324,7 +324,7 @@ describe('fetchAndStoreTiktokContent fallback handling', () => {
     jest.unstable_mockModule('../src/model/tiktokPostModel.js', () => ({
       upsertTiktokPosts: mockUpsert,
     }));
-    jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+    jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
       sendDebug: mockSendDebug,
     }));
     jest.unstable_mockModule('../src/service/tiktokApi.js', () => ({

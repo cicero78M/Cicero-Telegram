@@ -14,7 +14,7 @@ GET /api/insta/posts?client_id=KEDIRI
 
 ### Catatan Perilaku
 - Data yang dikembalikan hanya post dengan `created_at` pada tanggal hari ini (Asia/Jakarta).
-- Response mengikuti format `sendSuccess` (lihat `src/utils/response.js`).
+- Response mengikuti format standard JSON.
 - Sinkronisasi cron fetch post akan menghapus konten hari ini yang tidak lagi ada di hasil fetch, termasuk membersihkan data terkait (likes, komentar, dan audit like) agar tidak terkena kendala foreign key saat post dihapus.
 
 ## GET /api/instagram/posts

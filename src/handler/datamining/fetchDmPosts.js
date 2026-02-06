@@ -1,5 +1,5 @@
 import { fetchInstagramPosts } from '../../service/instagramApi.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 import { savePostWithMedia } from '../../model/instaPostExtendedModel.js';
 
 export async function fetchDmPosts(username, limit = 50) {

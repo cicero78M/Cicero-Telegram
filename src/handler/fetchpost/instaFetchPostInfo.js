@@ -2,7 +2,7 @@ import { fetchInstagramPostInfo } from '../../service/instagramApi.js';
 import { getShortcodesTodayByClient } from '../../model/instaPostModel.js';
 import { savePostWithMedia } from '../../model/instaPostExtendedModel.js';
 import { upsertPostMetrics } from '../../model/instaPostMetricsModel.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 
 export async function fetchAndStorePostInfo(shortcode) {
   try {

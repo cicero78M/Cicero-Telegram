@@ -12,7 +12,7 @@ import { fetchInstagramProfile } from "./instagramApi.js";
 import { fetchAndStoreInstaContent } from "../handler/fetchpost/instaFetchPost.js";
 import { fetchAndStoreTiktokContent } from "../handler/fetchpost/tiktokFetchPost.js";
 import { fetchTiktokProfile } from "./tiktokRapidService.js";
-import { sendConsoleDebug } from "../middleware/debugHandler.js";
+import { sendConsoleDebug } from "../utils/debugHandler.js";
 
 function normalizeRegionalId(value) {
   const normalized = String(value || "").trim();

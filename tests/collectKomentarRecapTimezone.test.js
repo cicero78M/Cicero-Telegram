@@ -32,7 +32,7 @@ jest.unstable_mockModule('../src/utils/utilsHelper.js', () => ({
 jest.unstable_mockModule('../src/utils/sqlPriority.js', () => ({
   getNamaPriorityIndex: () => 0,
 }));
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
   sendDebug: mockSendDebug,
 }));
 

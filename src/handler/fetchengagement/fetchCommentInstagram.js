@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { query } from '../../db/index.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 import { fetchAllInstagramComments } from '../../service/instagramApi.js';
 import { insertIgPostComments } from '../../model/igPostCommentModel.js';
 import { upsertIgUser } from '../../model/instaPostExtendedModel.js';

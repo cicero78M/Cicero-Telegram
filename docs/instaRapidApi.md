@@ -28,7 +28,7 @@ GET /api/insta/rapid-profile?username=polri
 ```
 
 ### Response
-- Sukses: format `sendSuccess` (lihat `src/utils/response.js`) dengan payload profil dari RapidAPI.
+- Sukses: format standard JSON dengan payload profil dari RapidAPI.
 - Gagal:
   - `400` jika `username` kosong.
   - `401` jika token tidak valid.

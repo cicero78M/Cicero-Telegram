@@ -13,7 +13,7 @@ import {
   formatNama,
   groupUsersByDivisionStatus,
 } from "../../../utils/utilsHelper.js";
-import { sendDebug } from "../../../middleware/debugHandler.js";
+import { sendDebug } from "../../../utils/debugHandler.js";
 import { sortUsersByPositionRankAndName } from "../../../utils/sortingHelper.js";
 
 const JAKARTA_TIMEZONE = "Asia/Jakarta";

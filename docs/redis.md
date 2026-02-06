@@ -28,9 +28,7 @@ The file `src/config/redis.js` reads this URL and creates the Redis client.
 Modules that rely on Redis include:
 
 - `authRoutes.js` – stores login tokens from `/auth/login` and `/auth/user-login` per client.
-- `dedupRequestMiddleware.js` – prevents duplicate requests by storing a short-lived hash in Redis.
 - `profileCacheService.js` – caches Instagram and TikTok profiles for one hour to speed up responses.
-- `requestHash.js` – helper utility that also interacts with Redis to store request hashes.
 
 ## 4. Clearing Data
 

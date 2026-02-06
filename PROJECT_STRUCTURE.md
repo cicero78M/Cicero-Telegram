@@ -361,7 +361,7 @@ The main application source code organized by responsibility.
 | Utility | Purpose |
 |---------|---------|
 | **logger.js** | Winston-based structured logging |
-| **response.js** | Standardized API response formatter |
+| **debugHandler.js** | Debug logging utility for console output |
 | **constants.js** | Application-wide constants |
 
 #### Security Utilities
@@ -369,7 +369,6 @@ The main application source code organized by responsibility.
 | Utility | Purpose |
 |---------|---------|
 | **crypt.js** | CryptoJS AES encryption/decryption |
-| **requestHash.js** | Redis-based request deduplication |
 
 #### Telegram Utilities
 
