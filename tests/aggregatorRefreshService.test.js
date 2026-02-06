@@ -56,7 +56,7 @@ jest.unstable_mockModule('../src/service/tiktokRapidService.js', () => ({
   fetchTiktokProfile: mockFetchTiktokProfile,
 }));
 
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
   sendConsoleDebug: mockSendConsoleDebug,
 }));
 

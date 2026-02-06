@@ -18,7 +18,7 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
 jest.unstable_mockModule('../src/model/instaLikeModel.js', () => ({
   saveLikeSnapshotAudit: mockSaveLikeSnapshotAudit,
 }));
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
   sendDebug: mockSendDebug,
 }));
 

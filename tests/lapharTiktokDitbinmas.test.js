@@ -22,7 +22,7 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   getUsersByDirektorat: mockGetUsersByDirektorat,
   getUsersByClient: jest.fn(),
 }));
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({
   sendDebug: mockSendDebug,
 }));
 

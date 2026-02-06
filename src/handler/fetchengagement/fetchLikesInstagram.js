@@ -1,7 +1,7 @@
 // src/handler/fetchengagement/fetchLikesInstagram.js
 
 import { query } from "../../db/index.js";
-import { sendDebug } from "../../middleware/debugHandler.js";
+import { sendDebug } from "../../utils/debugHandler.js";
 import { fetchAllInstagramLikes } from "../../service/instagramApi.js";
 import { getAllExceptionUsers } from "../../model/userModel.js";
 import { saveLikeSnapshotAudit } from "../../model/instaLikeModel.js";

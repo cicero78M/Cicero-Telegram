@@ -6,7 +6,7 @@ const mockSendDebug = jest.fn();
 
 jest.unstable_mockModule('../src/db/index.js', () => ({ query: mockQuery }));
 jest.unstable_mockModule('../src/service/tiktokApi.js', () => ({ fetchAllTiktokComments: mockFetchAll }));
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({ sendDebug: mockSendDebug }));
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({ sendDebug: mockSendDebug }));
 
 let handleFetchKomentarTiktokBatch;
 beforeAll(async () => {

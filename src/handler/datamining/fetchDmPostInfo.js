@@ -1,5 +1,5 @@
 import { fetchInstagramPostInfo } from '../../service/instagramApi.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 import { savePostWithMedia, getPostIdsTodayByUsername } from '../../model/instaPostExtendedModel.js';
 import { upsertPostMetrics } from '../../model/instaPostMetricsModel.js';
 

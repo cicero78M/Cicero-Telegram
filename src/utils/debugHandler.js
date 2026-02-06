@@ -1,4 +1,4 @@
-// src/middleware/debugHandler.js
+// src/utils/debugHandler.js
 
 // Helper: stringifier aman untuk circular object
 function safeStringify(obj) {

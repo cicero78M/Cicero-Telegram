@@ -21,7 +21,7 @@ jest.unstable_mockModule('../src/model/tiktokCommentModel.js', () => ({
   getCommentsByVideoId: mockGetCommentsByVideoId,
   deleteCommentsByVideoId: jest.fn(),
 }));
-jest.unstable_mockModule('../src/middleware/debugHandler.js', () => ({ sendDebug: mockSendDebug }));
+jest.unstable_mockModule('../src/utils/debugHandler.js', () => ({ sendDebug: mockSendDebug }));
 
 let absensiKomentar;
 beforeAll(async () => {

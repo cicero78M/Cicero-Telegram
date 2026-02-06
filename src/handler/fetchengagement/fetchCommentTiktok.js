@@ -2,7 +2,7 @@
 
 import pLimit from "p-limit";
 import { query } from "../../db/index.js";
-import { sendDebug } from "../../middleware/debugHandler.js";
+import { sendDebug } from "../../utils/debugHandler.js";
 import { fetchAllTiktokComments } from "../../service/tiktokApi.js";
 import { saveCommentSnapshotAudit } from "../../model/tiktokCommentModel.js";
 

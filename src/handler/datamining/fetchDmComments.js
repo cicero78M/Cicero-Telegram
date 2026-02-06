@@ -3,7 +3,7 @@ import { fetchAllInstagramComments } from '../../service/instagramApi.js';
 import { getPostIdShortcodePairsTodayByUsername } from '../../model/instaPostExtendedModel.js';
 import { insertIgPostComments } from '../../model/igPostCommentModel.js';
 import { upsertIgUser } from '../../model/instaPostExtendedModel.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 
 const limit = pLimit(3);
 

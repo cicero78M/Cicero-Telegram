@@ -3,7 +3,7 @@
 import { query } from "../../db/index.js";
 import { update } from "../../model/clientModel.js";
 import { upsertTiktokPosts } from "../../model/tiktokPostModel.js";
-import { sendDebug } from "../../middleware/debugHandler.js";
+import { sendDebug } from "../../utils/debugHandler.js";
 import {
   fetchTiktokPosts,
   fetchTiktokPostsBySecUid,

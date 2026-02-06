@@ -1,7 +1,7 @@
 import { query } from '../../db/index.js';
 import { fetchInstagramHashtag } from '../../service/instagramApi.js';
 import { upsertHashtagInfo } from '../../model/instaHashtagModel.js';
-import { sendDebug } from '../../middleware/debugHandler.js';
+import { sendDebug } from '../../utils/debugHandler.js';
 
 function extractTopHashtags(captions) {
   const count = {};
