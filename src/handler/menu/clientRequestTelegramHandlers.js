@@ -212,7 +212,7 @@ async function handleKelolaClientMenu(clientId, clientLabel) {
     `4️⃣ *Update Status Client*\n` +
     `   Perbarui status Instagram, TikTok, dan Amplifikasi\n\n` +
     `5️⃣ *Nonaktifkan Client*\n` +
-    `   Ubah status client menjadi tidak aktif\n\n` +
+    `   Client tidak dapat digunakan untuk operasi\n\n` +
     `Ketik nomor aksi (1-5) atau /menu untuk kembali.`;
 }
 

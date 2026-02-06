@@ -261,7 +261,7 @@ function setupMessageHandlers() {
     
     // Check if user is confirming client deactivation
     if (session && session.step === 'confirm_client_deactivation') {
-      await handleClientDeactivationConfirmation(chatId, text.trim(), msg.from);
+      await handleClientDeactivationConfirmation(chatId, text.trim().toUpperCase(), msg.from);
       return;
     }
     
@@ -1743,7 +1743,8 @@ async function handleClientDeactivationConfirmation(chatId, text, from) {
     
     const clientId = session.selectedClientId;
     const clientName = session.clientName || clientId;
-    const input = text.trim().toUpperCase();
+    // Input already normalized to uppercase by caller
+    const input = text.trim();
     
     // Handle "back" command
     if (input === 'KEMBALI' || input === 'BACK') {
