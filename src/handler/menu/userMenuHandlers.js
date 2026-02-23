@@ -47,7 +47,9 @@ function formatFieldList(showDesa = false) {
 3. Satfung
 4. Jabatan
 5. Instagram
-6. TikTok${showDesa ? "\n7. Desa Binaan" : ""}
+6. TikTok
+7. Instagram ke-2
+8. TikTok ke-2${showDesa ? "\n9. Desa Binaan" : ""}
 
 Balas angka field di atas atau *batal* untuk keluar.
 `.trim());
@@ -151,6 +153,8 @@ export const userMenuHandlers = {
       { key: "jabatan", label: "Jabatan" },
       { key: "insta", label: "Instagram" },
       { key: "tiktok", label: "TikTok" },
+      { key: "insta2", label: "Instagram ke-2" },
+      { key: "tiktok2", label: "TikTok ke-2" },
     ];
     if (session.isDitbinmas) {
       allowedFields.push({ key: "desa", label: "Desa Binaan" });
@@ -223,8 +227,12 @@ export const userMenuHandlers = {
     else if (field === "satfung") extra = " (pilih dari daftar satfung)";
     else if (field === "insta")
       extra = " (masukkan link profil atau username Instagram)";
+    else if (field === "insta2")
+      extra = " (masukkan link profil atau username Instagram akun ke-2)";
     else if (field === "tiktok")
       extra = " (masukkan link profil atau username TikTok)";
+    else if (field === "tiktok2")
+      extra = " (masukkan link profil atau username TikTok akun ke-2)";
 
     await waClient.sendMessage(
       chatId,
@@ -327,6 +335,28 @@ export const userMenuHandlers = {
         return;
       }
     }
+    if (field === "insta2") {
+      const igMatch = value.match(
+        /^(?:https?:\/\/(?:www\.)?instagram\.com\/)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
+      );
+      if (!igMatch) {
+        await waClient.sendMessage(
+          chatId,
+          "❌ Input Instagram ke-2 tidak valid! Masukkan *link profil* atau *username Instagram* (contoh: https://www.instagram.com/username atau @username)",
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      value = igMatch[1].toLowerCase();
+      const existing = await userModel.findUserBySocialAccount("instagram", value);
+      if (existing && existing.user_id !== user_id) {
+        await waClient.sendMessage(
+          chatId,
+          "❌ Akun Instagram ke-2 tersebut sudah terdaftar pada pengguna lain."
+        );
+        return;
+      }
+    }
     if (field === "tiktok") {
       const ttMatch = value.match(
         /^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
@@ -349,20 +379,56 @@ export const userMenuHandlers = {
         return;
       }
     }
+    if (field === "tiktok2") {
+      const ttMatch = value.match(
+        /^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
+      );
+      if (!ttMatch) {
+        await waClient.sendMessage(
+          chatId,
+          "❌ Input TikTok ke-2 tidak valid! Masukkan *link profil* atau *username TikTok* (contoh: https://www.tiktok.com/@username atau @username)",
+          { parse_mode: 'Markdown' }
+        );
+        return;
+      }
+      value = ttMatch[1].toLowerCase();
+      const existing = await userModel.findUserBySocialAccount("tiktok", value);
+      if (existing && existing.user_id !== user_id) {
+        await waClient.sendMessage(
+          chatId,
+          "❌ Akun TikTok ke-2 tersebut sudah terdaftar pada pengguna lain."
+        );
+        return;
+      }
+    }
     if (field === "whatsapp") value = normalizeWhatsappNumber(value);
     if (["nama", "title", "divisi", "jabatan", "desa"].includes(field)) value = value.toUpperCase();
 
-    await userModel.updateUserField(user_id, field, value);
+    if (field === "insta2") {
+      await userModel.upsertUserSocialAccount(user_id, "instagram", value, 2);
+    } else if (field === "tiktok2") {
+      await userModel.upsertUserSocialAccount(user_id, "tiktok", value, 2);
+    } else {
+      await userModel.updateUserField(user_id, field, value);
+      if (field === "insta") {
+        await userModel.upsertUserSocialAccount(user_id, "instagram", value, 1);
+      }
+      if (field === "tiktok") {
+        await userModel.upsertUserSocialAccount(user_id, "tiktok", value, 1);
+      }
+    }
     if (field === "whatsapp" && value) {
       await saveContactIfNew(formatToWhatsAppId(value));
     }
     const displayValue =
-      field === "insta" || field === "tiktok" ? `@${value}` : value;
+      ["insta", "tiktok", "insta2", "tiktok2"].includes(field) ? `@${value}` : value;
     
     const fieldLabel = 
       field === "title" ? "pangkat" :
       field === "divisi" ? "satfung" :
       field === "desa" ? "desa binaan" :
+      field === "insta2" ? "instagram ke-2" :
+      field === "tiktok2" ? "tiktok ke-2" :
       field;
     
     await waClient.sendMessage(

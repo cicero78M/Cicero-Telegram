@@ -40,6 +40,9 @@ const mockFindUserByTelegramChatId = jest.fn();
 const mockFindUserById = jest.fn();
 const mockFindUserByInsta = jest.fn();
 const mockFindUserByTiktok = jest.fn();
+const mockFindUserBySocialAccount = jest.fn();
+const mockUpsertUserSocialAccount = jest.fn();
+const mockGetUserSocialAccountsByUserId = jest.fn();
 const mockUpdateUserField = jest.fn();
 
 jest.unstable_mockModule('../src/model/userModel.js', () => ({
@@ -47,6 +50,9 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   findUserById: mockFindUserById,
   findUserByInsta: mockFindUserByInsta,
   findUserByTiktok: mockFindUserByTiktok,
+  findUserBySocialAccount: mockFindUserBySocialAccount,
+  upsertUserSocialAccount: mockUpsertUserSocialAccount,
+  getUserSocialAccountsByUserId: mockGetUserSocialAccountsByUserId,
   updateUserField: mockUpdateUserField,
 }));
 
@@ -107,6 +113,7 @@ describe('Telegram User Bot Commands', () => {
       
       mockFindUserByTelegramChatId.mockResolvedValue(mockUser);
       mockFindUserById.mockResolvedValue(mockUser);
+      mockGetUserSocialAccountsByUserId.mockResolvedValue([]);
       
       const msg = {
         chat: { id: 123456, type: 'private' },
@@ -157,8 +164,9 @@ describe('Telegram User Bot Commands', () => {
       };
       
       mockFindUserByTelegramChatId.mockResolvedValue(mockUser);
-      mockFindUserByInsta.mockResolvedValue(null);
+      mockFindUserBySocialAccount.mockResolvedValue(null);
       mockUpdateUserField.mockResolvedValue();
+      mockUpsertUserSocialAccount.mockResolvedValue();
       
       const msg = {
         chat: { id: 123456, type: 'private' },
@@ -170,6 +178,7 @@ describe('Telegram User Bot Commands', () => {
       await updateCommandHandler(msg, match);
       
       expect(mockUpdateUserField).toHaveBeenCalledWith('123456', 'insta', 'jokowi');
+      expect(mockUpsertUserSocialAccount).toHaveBeenCalledWith('123456', 'instagram', 'jokowi', 1);
       expect(mockSendMessage).toHaveBeenCalledWith(
         123456,
         expect.stringContaining('Berhasil mengupdate'),
@@ -186,8 +195,9 @@ describe('Telegram User Bot Commands', () => {
       };
       
       mockFindUserByTelegramChatId.mockResolvedValue(mockUser);
-      mockFindUserByTiktok.mockResolvedValue(null);
+      mockFindUserBySocialAccount.mockResolvedValue(null);
       mockUpdateUserField.mockResolvedValue();
+      mockUpsertUserSocialAccount.mockResolvedValue();
       
       const msg = {
         chat: { id: 123456, type: 'private' },
@@ -199,6 +209,7 @@ describe('Telegram User Bot Commands', () => {
       await updateCommandHandler(msg, match);
       
       expect(mockUpdateUserField).toHaveBeenCalledWith('123456', 'tiktok', 'awkarin');
+      expect(mockUpsertUserSocialAccount).toHaveBeenCalledWith('123456', 'tiktok', 'awkarin', 1);
       expect(mockSendMessage).toHaveBeenCalledWith(
         123456,
         expect.stringContaining('Berhasil mengupdate'),
@@ -313,6 +324,36 @@ describe('Telegram User Bot Commands', () => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         123456,
         expect.stringContaining('tidak valid'),
+        { parse_mode: 'Markdown' }
+      );
+    });
+
+    it('should update instagram2 to social accounts order 2', async () => {
+      await initializeTelegramUserBot('test-token', true);
+
+      const mockUser = {
+        user_id: '123456',
+        nama: 'BUDI SANTOSO',
+      };
+
+      mockFindUserByTelegramChatId.mockResolvedValue(mockUser);
+      mockFindUserBySocialAccount.mockResolvedValue(null);
+      mockUpsertUserSocialAccount.mockResolvedValue();
+
+      const msg = {
+        chat: { id: 123456, type: 'private' },
+        from: { id: 123456 },
+      };
+
+      const match = ['/update instagram2 @cadangan', 'instagram2', '@cadangan'];
+
+      await updateCommandHandler(msg, match);
+
+      expect(mockUpdateUserField).not.toHaveBeenCalledWith('123456', 'insta', 'cadangan');
+      expect(mockUpsertUserSocialAccount).toHaveBeenCalledWith('123456', 'instagram', 'cadangan', 2);
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        123456,
+        expect.stringContaining('Berhasil mengupdate'),
         { parse_mode: 'Markdown' }
       );
     });

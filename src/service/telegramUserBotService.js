@@ -61,6 +61,28 @@ export async function initializeTelegramUserBot(token, enabled = true) {
 function setupCommandHandlers() {
   if (!userBot) return;
 
+  const socialFieldConfigs = {
+    instagram: { platform: 'instagram', accountOrder: 1, label: 'Instagram' },
+    insta: { platform: 'instagram', accountOrder: 1, label: 'Instagram' },
+    instagram2: { platform: 'instagram', accountOrder: 2, label: 'Instagram ke-2' },
+    insta2: { platform: 'instagram', accountOrder: 2, label: 'Instagram ke-2' },
+    tiktok: { platform: 'tiktok', accountOrder: 1, label: 'TikTok' },
+    tiktok2: { platform: 'tiktok', accountOrder: 2, label: 'TikTok ke-2' },
+  };
+
+  const normalizeSocialUsername = (platform, rawValue) => {
+    const value = (rawValue || '').trim();
+    if (platform === 'instagram') {
+      const match = value.match(/^(?:https?:\/\/(?:www\.)?instagram\.com\/)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i);
+      return match?.[1]?.toLowerCase() || null;
+    }
+    if (platform === 'tiktok') {
+      const match = value.match(/^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i);
+      return match?.[1]?.toLowerCase() || null;
+    }
+    return null;
+  };
+
   // /start command
   userBot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
@@ -84,7 +106,7 @@ function setupCommandHandlers() {
         'Akun Telegram Anda sudah ditautkan.\n\n' +
         '*Perintah yang tersedia:*\n' +
         '/profile - Lihat profil Anda\n' +
-        '/update - Update data (Instagram, TikTok, nama, email, phone)\n' +
+        '/update - Update data (Instagram, TikTok, Instagram ke-2, TikTok ke-2, nama, email, phone)\n' +
         '/menu - Menu interaktif\n' +
         '/help - Bantuan lengkap';
       
@@ -131,13 +153,19 @@ function setupCommandHandlers() {
         '   `/update tiktok @username`\n' +
         '   Contoh: `/update tiktok @jokowi`\n' +
         '   Contoh: `/update tiktok @awkarin`\n\n' +
-        '*3. Update Nama*\n' +
+        '*3. Update Instagram ke-2*\n' +
+        '   `/update instagram2 @username`\n' +
+        '   Contoh: `/update instagram2 @usernamecadangan`\n\n' +
+        '*4. Update TikTok ke-2*\n' +
+        '   `/update tiktok2 @username`\n' +
+        '   Contoh: `/update tiktok2 @usernamecadangan`\n\n' +
+        '*5. Update Nama*\n' +
         '   `/update nama Nama Lengkap`\n' +
         '   Contoh: `/update nama Budi Santoso`\n\n' +
-        '*4. Update Email*\n' +
+        '*6. Update Email*\n' +
         '   `/update email nama@email.com`\n' +
         '   Contoh: `/update email budi@gmail.com`\n\n' +
-        '*5. Update Telepon*\n' +
+        '*7. Update Telepon*\n' +
         '   `/update phone +628xxxxxxxxx`\n' +
         '   Contoh: `/update phone +628123456789`\n\n' +
         '*✅ CEK DATA SAAT INI*\n' +
@@ -217,6 +245,11 @@ function setupCommandHandlers() {
       const desa = escapeMarkdown(user.desa || '-');
       const insta = user.insta ? '@' + escapeMarkdown(user.insta.replace(/^@/, '')) : '-';
       const tiktok = user.tiktok ? '@' + escapeMarkdown(user.tiktok.replace(/^@/, '')) : '-';
+      const socialAccounts = await userModel.getUserSocialAccountsByUserId(linkedUser.user_id);
+      const instagramSecond = socialAccounts.find((row) => row.platform === 'instagram' && Number(row.account_order) === 2 && row.is_active);
+      const tiktokSecond = socialAccounts.find((row) => row.platform === 'tiktok' && Number(row.account_order) === 2 && row.is_active);
+      const insta2 = instagramSecond ? '@' + escapeMarkdown(String(instagramSecond.username).replace(/^@/, '')) : '-';
+      const tiktok2 = tiktokSecond ? '@' + escapeMarkdown(String(tiktokSecond.username).replace(/^@/, '')) : '-';
       const whatsapp = escapeMarkdown(user.whatsapp || '-');
       const email = escapeMarkdown(user.email || '-');
       const status = (user.status === true || user.status === 'true') ? '🟢 AKTIF' : '🔴 NONAKTIF';
@@ -233,6 +266,8 @@ function setupCommandHandlers() {
         ...(user.ditbinmas ? [`*Desa Binaan* : ${desa}`] : []),
         `*Instagram*  : ${insta}`,
         `*TikTok*     : ${tiktok}`,
+        `*Instagram 2*: ${insta2}`,
+        `*TikTok 2*   : ${tiktok2}`,
         `*WhatsApp*   : ${whatsapp}`,
         `*Email*      : ${email}`,
         `*Status*     : ${status}`,
@@ -534,12 +569,16 @@ function setupCommandHandlers() {
         '*Field yang tersedia:*\n' +
         '• `instagram` - Update Instagram\n' +
         '• `tiktok` - Update TikTok\n' +
+        '• `instagram2` - Update Instagram ke-2\n' +
+        '• `tiktok2` - Update TikTok ke-2\n' +
         '• `nama` - Update nama lengkap\n' +
         '• `email` - Update email\n' +
         '• `phone` - Update nomor telepon\n\n' +
         '*Contoh:*\n' +
         '`/update instagram @jokowi`\n' +
         '`/update tiktok @awkarin`\n' +
+        '`/update instagram2 @usernamecadangan`\n' +
+        '`/update tiktok2 @usernamecadangan`\n' +
         '`/update nama Budi Santoso`\n' +
         '`/update email budi@gmail.com`\n' +
         '`/update phone +628123456789`\n\n' +
@@ -569,73 +608,46 @@ function setupCommandHandlers() {
       // Handle different field types
       switch (field) {
         case 'instagram':
-        case 'insta': {
-          dbField = 'insta';
-          // Extract username from Instagram URL or handle
-          const igMatch = processedValue.match(
-            /^(?:https?:\/\/(?:www\.)?instagram\.com\/)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
-          );
-          if (!igMatch) {
+        case 'insta':
+        case 'instagram2':
+        case 'insta2':
+        case 'tiktok':
+        case 'tiktok2': {
+          const config = socialFieldConfigs[field];
+          const username = normalizeSocialUsername(config.platform, processedValue);
+          if (!username) {
+            const isInstagram = config.platform === 'instagram';
             await userBot.sendMessage(
               chatId,
-              '❌ Format Instagram tidak valid!\n\n' +
+              `❌ Format ${isInstagram ? 'Instagram' : 'TikTok'} tidak valid!\n\n` +
               '*Format yang diterima:*\n' +
               '• `@username`\n' +
               '• `username`\n' +
-              '• `https://www.instagram.com/username`\n\n' +
+              `• ${isInstagram ? '`https://www.instagram.com/username`' : '`https://www.tiktok.com/@username`'}\n\n` +
               '*Contoh:*\n' +
-              '`/update instagram @jokowi`\n' +
-              '`/update instagram raffinagita1717`',
+              `\`/update ${field} @jokowi\`\n` +
+              `\`/update ${field} usernamecontoh\``,
               { parse_mode: 'Markdown' }
             );
             return;
           }
-          processedValue = igMatch[1].toLowerCase();
+
+          processedValue = username;
           displayValue = '@' + processedValue;
-          
-          // Check if Instagram is already taken
-          const existingIg = await userModel.findUserByInsta(processedValue);
-          if (existingIg && existingIg.user_id !== userId) {
+
+          const existingAccount = await userModel.findUserBySocialAccount(config.platform, processedValue);
+          if (existingAccount && existingAccount.user_id !== userId) {
             await userBot.sendMessage(
               chatId,
-              '❌ Akun Instagram tersebut sudah terdaftar pada pengguna lain.'
+              `❌ Akun ${config.label} tersebut sudah terdaftar pada pengguna lain.`
             );
             return;
           }
-          break;
-        }
-        
-        case 'tiktok': {
-          // Extract username from TikTok URL or handle
-          const ttMatch = processedValue.match(
-            /^(?:https?:\/\/(?:www\.)?tiktok\.com\/@)?@?([A-Za-z0-9._]+)\/?(?:\?.*)?$/i
-          );
-          if (!ttMatch) {
-            await userBot.sendMessage(
-              chatId,
-              '❌ Format TikTok tidak valid!\n\n' +
-              '*Format yang diterima:*\n' +
-              '• `@username`\n' +
-              '• `username`\n' +
-              '• `https://www.tiktok.com/@username`\n\n' +
-              '*Contoh:*\n' +
-              '`/update tiktok @jokowi`\n' +
-              '`/update tiktok awkarin`',
-              { parse_mode: 'Markdown' }
-            );
-            return;
-          }
-          processedValue = ttMatch[1].toLowerCase();
-          displayValue = '@' + processedValue;
-          
-          // Check if TikTok is already taken
-          const existingTt = await userModel.findUserByTiktok(processedValue);
-          if (existingTt && existingTt.user_id !== userId) {
-            await userBot.sendMessage(
-              chatId,
-              '❌ Akun TikTok tersebut sudah terdaftar pada pengguna lain.'
-            );
-            return;
+
+          if (config.accountOrder === 1) {
+            dbField = config.platform === 'instagram' ? 'insta' : 'tiktok';
+          } else {
+            dbField = null;
           }
           break;
         }
@@ -709,6 +721,8 @@ function setupCommandHandlers() {
             '*Field yang tersedia:*\n' +
             '• `instagram` - Update Instagram\n' +
             '• `tiktok` - Update TikTok\n' +
+            '• `instagram2` - Update Instagram ke-2\n' +
+            '• `tiktok2` - Update TikTok ke-2\n' +
             '• `nama` - Update nama lengkap\n' +
             '• `email` - Update email\n' +
             '• `phone` - Update nomor telepon\n\n' +
@@ -719,8 +733,15 @@ function setupCommandHandlers() {
         }
       }
       
-      // Update the field
-      await userModel.updateUserField(userId, dbField, processedValue);
+      if (socialFieldConfigs[field]) {
+        const config = socialFieldConfigs[field];
+        if (config.accountOrder === 1 && dbField) {
+          await userModel.updateUserField(userId, dbField, processedValue);
+        }
+        await userModel.upsertUserSocialAccount(userId, config.platform, processedValue, config.accountOrder);
+      } else {
+        await userModel.updateUserField(userId, dbField, processedValue);
+      }
       
       await userBot.sendMessage(
         chatId,

@@ -15,6 +15,8 @@ describe("userMenuHandlers.updateAskValue social media normalization", () => {
       updateUserField: jest.fn().mockResolvedValue(),
       findUserByInsta: jest.fn().mockResolvedValue(null),
       findUserByTiktok: jest.fn().mockResolvedValue(null),
+      findUserBySocialAccount: jest.fn().mockResolvedValue(null),
+      upsertUserSocialAccount: jest.fn().mockResolvedValue(),
     };
     jest.spyOn(userMenuHandlers, "main").mockResolvedValue();
   });
@@ -52,7 +54,8 @@ describe("userMenuHandlers.updateAskValue social media normalization", () => {
     );
     expect(waClient.sendMessage).toHaveBeenCalledWith(
       chatId,
-      expect.stringContaining("*@user.name*.")
+      expect.stringContaining("*@user.name*."),
+      { parse_mode: "Markdown" }
     );
   });
 
@@ -80,7 +83,8 @@ describe("userMenuHandlers.updateAskValue social media normalization", () => {
     );
     expect(waClient.sendMessage).toHaveBeenCalledWith(
       chatId,
-      expect.stringContaining("*@another.user*.")
+      expect.stringContaining("*@another.user*."),
+      { parse_mode: "Markdown" }
     );
   });
 
@@ -102,6 +106,28 @@ describe("userMenuHandlers.updateAskValue social media normalization", () => {
     expect(waClient.sendMessage).toHaveBeenCalledWith(
       chatId,
       "❌ Akun TikTok tersebut sudah terdaftar pada pengguna lain."
+    );
+  });
+
+  it("stores Instagram ke-2 to user_social_accounts order 2", async () => {
+    const session = buildSession("insta2");
+
+    await userMenuHandlers.updateAskValue(
+      session,
+      chatId,
+      "https://www.instagram.com/Second.User",
+      waClient,
+      pool,
+      userModel
+    );
+
+    expect(userModel.updateUserField).not.toHaveBeenCalled();
+    expect(userModel.findUserBySocialAccount).toHaveBeenCalledWith("instagram", "second.user");
+    expect(userModel.upsertUserSocialAccount).toHaveBeenCalledWith(
+      "12345",
+      "instagram",
+      "second.user",
+      2
     );
   });
 });
