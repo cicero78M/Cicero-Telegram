@@ -602,6 +602,8 @@ export async function getUsersByDirektorat(flag, clientId = null) {
 
 export async function findUserByInsta(insta) {
   if (!insta) return null;
+  const socialAccountUser = await findUserBySocialAccount('instagram', insta);
+  if (socialAccountUser) return socialAccountUser;
   const { rows } = await query(
       `SELECT u.*,\n      c.nama AS client_name,\n      bool_or(r.role_name='ditbinmas') AS ditbinmas,\n      bool_or(r.role_name='ditlantas') AS ditlantas,\n      bool_or(r.role_name='bidhumas') AS bidhumas,\n      bool_or(r.role_name='ditsamapta') AS ditsamapta,\n      bool_or(r.role_name='operator') AS operator\n     FROM "user" u\n     LEFT JOIN clients c ON c.client_id = u.client_id\n     LEFT JOIN user_roles ur ON u.user_id = ur.user_id\n     LEFT JOIN roles r ON ur.role_id = r.role_id\n     WHERE LOWER(u.insta) = LOWER($1)\n     GROUP BY u.user_id, c.nama`,
     [insta]
@@ -611,11 +613,88 @@ export async function findUserByInsta(insta) {
 
 export async function findUserByTiktok(tiktok) {
   if (!tiktok) return null;
+  const socialAccountUser = await findUserBySocialAccount('tiktok', tiktok);
+  if (socialAccountUser) return socialAccountUser;
   const { rows } = await query(
       `SELECT u.*,\n      c.nama AS client_name,\n      bool_or(r.role_name='ditbinmas') AS ditbinmas,\n      bool_or(r.role_name='ditlantas') AS ditlantas,\n      bool_or(r.role_name='bidhumas') AS bidhumas,\n      bool_or(r.role_name='ditsamapta') AS ditsamapta,\n      bool_or(r.role_name='operator') AS operator\n     FROM "user" u\n     LEFT JOIN clients c ON c.client_id = u.client_id\n     LEFT JOIN user_roles ur ON u.user_id = ur.user_id\n     LEFT JOIN roles r ON ur.role_id = r.role_id\n     WHERE LOWER(u.tiktok) = LOWER($1)\n     GROUP BY u.user_id, c.nama`,
     [tiktok]
   );
   return rows[0];
+}
+
+async function runSocialAccountQuery(queryText, params = []) {
+  try {
+    return await query(queryText, params);
+  } catch (error) {
+    if (error?.code === '42P01') {
+      return { rows: [] };
+    }
+    throw error;
+  }
+}
+
+export async function findUserBySocialAccount(platform, username, accountOrder = null) {
+  if (!platform || !username) return null;
+  const normalizedPlatform = String(platform).toLowerCase();
+  const normalizedUsername = String(username).replace(/^@/, '').toLowerCase();
+  const params = [normalizedPlatform, normalizedUsername];
+  const orderClause = accountOrder == null ? '' : ' AND usa.account_order = $3';
+  if (accountOrder != null) params.push(accountOrder);
+
+  const { rows } = await runSocialAccountQuery(
+    `SELECT u.*,
+            c.nama AS client_name,
+            bool_or(r.role_name='ditbinmas') AS ditbinmas,
+            bool_or(r.role_name='ditlantas') AS ditlantas,
+            bool_or(r.role_name='bidhumas') AS bidhumas,
+            bool_or(r.role_name='ditsamapta') AS ditsamapta,
+            bool_or(r.role_name='operator') AS operator
+       FROM user_social_accounts usa
+       JOIN "user" u ON u.user_id = usa.user_id
+       LEFT JOIN clients c ON c.client_id = u.client_id
+       LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+       LEFT JOIN roles r ON ur.role_id = r.role_id
+      WHERE LOWER(usa.platform) = $1
+        AND LOWER(usa.username) = $2
+        AND usa.is_active = TRUE${orderClause}
+      GROUP BY u.user_id, c.nama
+      ORDER BY u.updated_at DESC
+      LIMIT 1`,
+    params
+  );
+
+  return rows[0] || null;
+}
+
+export async function upsertUserSocialAccount(userId, platform, username, accountOrder = 1) {
+  const uid = normalizeUserId(userId);
+  const normalizedPlatform = String(platform).toLowerCase();
+  const normalizedUsername = String(username).replace(/^@/, '').toLowerCase();
+  const normalizedOrder = Number(accountOrder || 1);
+
+  await runSocialAccountQuery(
+    `INSERT INTO user_social_accounts (user_id, platform, username, account_order, is_active)
+     VALUES ($1, $2, $3, $4, TRUE)
+     ON CONFLICT (user_id, platform, account_order)
+     DO UPDATE SET username = EXCLUDED.username,
+                   is_active = TRUE,
+                   updated_at = NOW()`,
+    [uid, normalizedPlatform, normalizedUsername, normalizedOrder]
+  );
+
+  return { user_id: uid, platform: normalizedPlatform, username: normalizedUsername, account_order: normalizedOrder };
+}
+
+export async function getUserSocialAccountsByUserId(userId) {
+  const uid = normalizeUserId(userId);
+  const { rows } = await runSocialAccountQuery(
+    `SELECT platform, username, account_order, is_active
+       FROM user_social_accounts
+      WHERE user_id = $1
+      ORDER BY platform, account_order`,
+    [uid]
+  );
+  return rows;
 }
 
 export async function findUserByWhatsApp(wa) {
