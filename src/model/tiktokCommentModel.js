@@ -309,9 +309,9 @@ export async function getRekapKomentarByClient(
   } else if (periode === "mingguan") {
     if (tanggal) {
       const idx = addParam(tanggal);
-      tanggalFilter = `date_trunc('week', __DATE_FIELD__) = date_trunc('week', $${idx}::date)`;
+      tanggalFilter = `date_trunc('week', __DATE_FIELD__) = date_trunc('week', (($${idx}::date)::timestamp AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')`;
     } else {
-      tanggalFilter = "date_trunc('week', __DATE_FIELD__) = date_trunc('week', NOW())";
+      tanggalFilter = "date_trunc('week', __DATE_FIELD__) = date_trunc('week', NOW() AT TIME ZONE 'Asia/Jakarta')";
     }
   } else if (periode === "bulanan") {
     if (tanggal) {
