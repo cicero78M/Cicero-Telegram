@@ -1,80 +1,76 @@
 import { query } from '../../../db/index.js';
 import { getWebLoginCountsByActor } from '../../../model/loginLogModel.js';
 import { getGreeting } from '../../../utils/utilsHelper.js';
+import {
+  addDaysYmd,
+  formatJakartaYmd,
+  getJakartaDayRange,
+  getJakartaMonthEndYmd,
+  getJakartaMonthStartYmd,
+  getJakartaWeekdayIndex,
+} from '../../../utils/jakartaDate.js';
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
-const monthFormatter = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
+const monthFormatter = new Intl.DateTimeFormat('id-ID', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Asia/Jakarta',
+});
 
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+function normalizeToJakartaYmd(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
 
-function endOfDay(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
 
-function startOfMonth(date) {
-  const d = new Date(date);
-  d.setDate(1);
-  return startOfDay(d);
-}
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${fieldName} tidak valid`);
+  }
 
-function endOfMonth(date) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + 1, 0);
-  return endOfDay(d);
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+  return formatJakartaYmd(parsed);
 }
 
 function resolveRange({ mode, startTime, endTime }) {
   const normalizedMode = mode === 'mingguan' ? 'mingguan' : 'harian';
-  let start = startTime ? new Date(startTime) : null;
-  let end = endTime ? new Date(endTime) : null;
+  let startYmd = normalizeToJakartaYmd(startTime, 'startTime');
+  let endYmd = normalizeToJakartaYmd(endTime, 'endTime');
 
-  if (startTime && Number.isNaN(start?.getTime())) {
-    throw new Error('startTime tidak valid');
-  }
-
-  if (endTime && Number.isNaN(end?.getTime())) {
-    throw new Error('endTime tidak valid');
-  }
-
-  if (!start && !end) {
+  if (!startYmd && !endYmd) {
     const now = new Date();
     if (normalizedMode === 'mingguan') {
-      const day = now.getDay() === 0 ? 6 : now.getDay() - 1;
-      start = startOfDay(addDays(now, -day));
-      end = endOfDay(addDays(start, 6));
+      const weekday = getJakartaWeekdayIndex(now);
+      const offsetToMonday = weekday === 0 ? 6 : weekday - 1;
+      startYmd = addDaysYmd(formatJakartaYmd(now), -offsetToMonday);
+      endYmd = addDaysYmd(startYmd, 6);
     } else {
-      start = startOfDay(now);
-      end = endOfDay(now);
+      startYmd = formatJakartaYmd(now);
+      endYmd = startYmd;
     }
   } else {
-    start = start ? startOfDay(start) : startOfDay(end);
-    end = end ? endOfDay(end) : endOfDay(start);
+    startYmd = startYmd || endYmd;
+    endYmd = endYmd || startYmd;
   }
+
+  const start = getJakartaDayRange(startYmd).start;
+  const end = getJakartaDayRange(endYmd).end;
 
   return { start, end, mode: normalizedMode };
 }
 
 function resolveMonthlyRange({ startTime, endTime }) {
-  const baseDate = startTime || endTime || new Date();
-  const parsed = new Date(baseDate);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error('Tanggal periode bulanan tidak valid');
-  }
-  const start = startOfMonth(baseDate);
-  const end = endOfMonth(baseDate);
-  return { start, end };
+  const startYmd = normalizeToJakartaYmd(startTime, 'startTime');
+  const endYmd = normalizeToJakartaYmd(endTime, 'endTime');
+  const baseValue = startYmd || endYmd || new Date();
+
+  const monthStartYmd = getJakartaMonthStartYmd(baseValue);
+  const monthEndYmd = getJakartaMonthEndYmd(baseValue);
+
+  return {
+    start: getJakartaDayRange(monthStartYmd).start,
+    end: getJakartaDayRange(monthEndYmd).end,
+  };
 }
 
 function formatDate(date) {

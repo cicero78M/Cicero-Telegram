@@ -4,6 +4,12 @@ import XLSX from 'xlsx';
 import { hariIndo } from '../utils/constants.js';
 import { getNamaPriorityIndex } from '../utils/sqlPriority.js';
 import { getRekapLikesByClient } from '../model/instaLikeModel.js';
+import {
+  getJakartaMonthStartYmd,
+  getJakartaTodayYmd,
+  getJakartaWeekdayIndex,
+  iterateJakartaDates,
+} from '../utils/jakartaDate.js';
 
 const RANK_ORDER = [
   'KOMISARIS BESAR POLISI',
@@ -27,24 +33,20 @@ function rankWeight(rank) {
   return idx === -1 ? RANK_ORDER.length : idx;
 }
 
+function formatDisplay(ymd) {
+  return new Date(`${ymd}T00:00:00Z`).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Asia/Jakarta',
+  });
+}
+
 export async function saveMonthlyLikesRecapExcel(clientId) {
   const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endDate = new Date(now);
-
-  const formatIso = (d) => d.toISOString().slice(0, 10);
-  const formatDisplay = (d) =>
-    new Date(d).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      timeZone: 'Asia/Jakarta',
-    });
-
-  const dateList = [];
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    dateList.push(formatIso(d));
-  }
+  const startYmd = getJakartaMonthStartYmd(now);
+  const endYmd = getJakartaTodayYmd(now);
+  const dateList = iterateJakartaDates(startYmd, endYmd);
 
   const grouped = {};
   const dailyPosts = {};
@@ -110,7 +112,7 @@ export async function saveMonthlyLikesRecapExcel(clientId) {
     const aoa = [];
     const colCount = 4 + dateList.length * 3;
     const title = `${satker} – Rekap Engagement Instagram`;
-    const periodStr = `${formatDisplay(startDate)} - ${formatDisplay(endDate)}`;
+    const periodStr = `${formatDisplay(startYmd)} - ${formatDisplay(endYmd)}`;
     const subtitle = `Rekap Likes Instagram Periode ${periodStr}`;
     aoa.push([title]);
     aoa.push([subtitle]);
@@ -188,8 +190,8 @@ export async function saveMonthlyLikesRecapExcel(clientId) {
   const exportDir = path.resolve('export_data/monthly_likes');
   await mkdir(exportDir, { recursive: true });
 
-  const hari = hariIndo[endDate.getDay()];
-  const tanggal = endDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const hari = hariIndo[getJakartaWeekdayIndex(now)];
+  const tanggal = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
   const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const dateSafe = tanggal.replace(/\//g, '-');
   const timeSafe = jam.replace(/[:.]/g, '-');
