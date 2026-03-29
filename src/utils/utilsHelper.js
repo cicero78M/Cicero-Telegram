@@ -140,8 +140,12 @@ export function normalizeKomentarArr(arr) {
 
 // Helper salam
 export function getGreeting() {
-  const now = new Date();
-  const hour = now.getHours();
+  const hourFormatter = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    hour12: false,
+  });
+  const hour = Number(hourFormatter.format(new Date()));
   if (hour >= 4 && hour < 10) return "Selamat pagi";
   if (hour >= 10 && hour < 15) return "Selamat siang";
   if (hour >= 15 && hour < 18) return "Selamat sore";
