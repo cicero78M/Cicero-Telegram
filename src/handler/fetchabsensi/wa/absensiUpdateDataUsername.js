@@ -32,15 +32,20 @@ export async function absensiUpdateDataUsername(clientId, roleFlag = null) {
 
   const salam = getGreeting();
   const now = new Date();
-  const hari = now.toLocaleDateString("id-ID", { weekday: "long" });
+  const hari = now.toLocaleDateString("id-ID", {
+    weekday: "long",
+    timeZone: "Asia/Jakarta",
+  });
   const tanggal = now.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const jam = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
 
   const grouped = users.reduce((acc, user) => {

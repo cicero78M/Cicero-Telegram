@@ -355,8 +355,8 @@ export async function saveWeeklyCommentRecapExcel(clientId, { regionalId } = {})
     : new Date(weekEnd);
   const now = new Date();
   const hari = hariIndo[fileDate.getDay()];
-  const tanggal = fileDate.toLocaleDateString('id-ID');
-  const jam = now.toLocaleTimeString('id-ID', { hour12: false });
+  const tanggal = fileDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const dateSafe = tanggal.replace(/\//g, '-');
   const timeSafe = jam.replace(/[:.]/g, '-');
   const formattedClient = (clientId || '')

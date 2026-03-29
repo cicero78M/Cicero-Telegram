@@ -32,8 +32,8 @@ function buildExportPath(prefix, clientId) {
   const exportDir = path.resolve('export_data/likes_recap');
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggalStr = now.toLocaleDateString('id-ID');
-  const jam = now.toLocaleTimeString('id-ID', { hour12: false });
+  const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const dateSafe = tanggalStr.replace(/\//g, '-');
   const timeSafe = jam.replace(/[:.]/g, '-');
   const formattedClient = formatClientName(clientId);
@@ -50,7 +50,7 @@ function buildExportPath(prefix, clientId) {
 export async function saveLikesRecapExcel(data, clientId) {
   const { shortcodes = [], recap = {} } = data || {};
   const wb = XLSX.utils.book_new();
-  const recapDate = new Date().toLocaleDateString('id-ID');
+  const recapDate = new Date().toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
 
   Object.entries(recap).forEach(([polres, users]) => {
     const header = [
