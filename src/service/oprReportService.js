@@ -71,8 +71,8 @@ export async function generateDailyAmplificationReport(clientId) {
   
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString('id-ID');
-  const jam = now.toLocaleTimeString('id-ID', { hour12: false });
+  const tanggal = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const salam = getGreeting();
   
   const { rows: nameRows } = await query(
@@ -163,8 +163,8 @@ export async function generateYesterdayAmplificationReport(clientId) {
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
   const hari = hariIndo[yesterday.getDay()];
-  const tanggal = yesterday.toLocaleDateString('id-ID');
-  const jam = now.toLocaleTimeString('id-ID', { hour12: false });
+  const tanggal = yesterday.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const salam = getGreeting();
   
   const { rows: nameRows } = await query(

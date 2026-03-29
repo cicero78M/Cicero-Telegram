@@ -36,8 +36,8 @@ export async function rekapLink(clientId) {
     list.youtube.length;
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
   const salam = getGreeting();
   const clientName = await getClientName(clientId);
   const kontenLinks = shortcodes.map((sc) => `https://www.instagram.com/p/${sc}`);

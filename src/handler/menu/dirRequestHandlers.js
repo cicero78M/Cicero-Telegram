@@ -263,15 +263,20 @@ async function formatRekapUserData(clientId, roleFlag = null) {
   const users = await getUsersSocialByClient(clientId, filterRole);
   const salam = getGreeting();
   const now = new Date();
-  const hari = now.toLocaleDateString("id-ID", { weekday: "long" });
+  const hari = now.toLocaleDateString("id-ID", {
+    weekday: "long",
+    timeZone: "Asia/Jakarta",
+  });
   const tanggal = now.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const jam = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
 
   const isDirektoratView =
@@ -712,15 +717,20 @@ async function formatRekapBelumLengkapDirektorat(clientId) {
 
   const salam = getGreeting();
   const now = new Date();
-  const hari = now.toLocaleDateString("id-ID", { weekday: "long" });
+  const hari = now.toLocaleDateString("id-ID", {
+    weekday: "long",
+    timeZone: "Asia/Jakarta",
+  });
   const tanggal = now.toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const jam = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
   const incomplete = {};
   targetUsers.forEach((u) => {
@@ -841,10 +851,12 @@ async function formatExecutiveSummary(clientId, roleFlag = null) {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const timeStr = now.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
   const lines = [
     "Mohon Ijin Komandan,",
@@ -932,6 +944,7 @@ async function formatRekapAllSosmed(
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "Asia/Jakarta",
   });
   const todayKey = now.toDateString();
 

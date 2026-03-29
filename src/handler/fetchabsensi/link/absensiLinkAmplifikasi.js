@@ -27,8 +27,8 @@ export async function absensiLink(client_id, opts = {}) {
   const { clientFilter, roleFlag } = opts;
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
 
   const { nama: clientNama, clientType } = await getClientInfo(client_id);
   let users;
@@ -190,8 +190,8 @@ export async function absensiLink(client_id, opts = {}) {
 export async function absensiLinkPerPost(client_id, opts = {}) {
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
 
   const { nama: clientNama, clientType } = await getClientInfo(client_id);
   const users =

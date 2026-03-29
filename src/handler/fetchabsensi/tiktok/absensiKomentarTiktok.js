@@ -153,8 +153,11 @@ export async function absensiKomentar(client_id, opts = {}) {
   const isOperatorRole = normalizedRole === "operator";
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
 
   const clientInfo = await getClientInfo(client_id);
   const clientNama = clientInfo.nama;
@@ -606,8 +609,11 @@ export async function absensiKomentarDitbinmasSimple(clientId = "DITBINMAS") {
   const roleName = targetClientId.toLowerCase();
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
 
   const { tiktok: mainUsername, nama: clientName } = await getClientInfo(targetClientId);
   const clientNameUpper = String(clientName || targetClientId).toUpperCase();
@@ -746,8 +752,11 @@ export async function absensiKomentarDitbinmasReport(clientId = "DITBINMAS") {
   const roleName = targetClientId.toLowerCase();
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
 
   const { tiktok: mainUsername, nama: clientName } = await getClientInfo(targetClientId);
 
@@ -935,9 +944,12 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
   const roleName = String(clientId || "DITBINMAS").toLowerCase();
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
   const dateKey = now.toDateString();
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
   const dateSafe = tanggal.replace(/\//g, "-");
   const timeSafe = jam.replace(/[:.]/g, "-");
   const filename = `Absensi_All_Engagement_Tiktok_${hari}_${dateSafe}_${timeSafe}.txt`;
@@ -1283,8 +1295,11 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
 export async function absensiKomentarTiktokPerKonten(client_id, opts = {}) {
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
 
   const clientInfo = await getClientInfo(client_id);
   const clientNama = clientInfo.nama;

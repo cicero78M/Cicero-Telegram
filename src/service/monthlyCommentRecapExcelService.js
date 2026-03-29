@@ -40,6 +40,7 @@ export async function saveMonthlyCommentRecapExcel(clientId, { regionalId } = {}
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      timeZone: 'Asia/Jakarta',
     });
 
   const dateList = [];
@@ -198,8 +199,8 @@ export async function saveMonthlyCommentRecapExcel(clientId, { regionalId } = {}
   await mkdir(exportDir, { recursive: true });
 
   const hari = hariIndo[endDate.getDay()];
-  const tanggal = endDate.toLocaleDateString('id-ID');
-  const jam = now.toLocaleTimeString('id-ID', { hour12: false });
+  const tanggal = endDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const jam = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
   const dateSafe = tanggal.replace(/\//g, '-');
   const timeSafe = jam.replace(/[:.]/g, '-');
   const formattedClient = (clientId || '')

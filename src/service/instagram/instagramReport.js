@@ -540,9 +540,12 @@ export function formatDitbinmasNarrative(stats) {
 export async function lapharDitbinmas(clientId = "DITBINMAS") {
   const now = new Date();
   const hari = hariIndo[now.getDay()];
-  const tanggal = now.toLocaleDateString("id-ID");
+  const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
   const dateKey = now.toDateString();
-  const jam = now.toLocaleTimeString("id-ID", { hour12: false });
+  const jam = now.toLocaleTimeString("id-ID", {
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
   const dateSafe = tanggal.replace(/\//g, "-");
   const timeSafe = jam.replace(/[:.]/g, "-");
   const filename = `Absensi_All_Engagement_Instagram_${hari}_${dateSafe}_${timeSafe}.txt`;
@@ -592,4 +595,3 @@ export async function lapharDitbinmas(clientId = "DITBINMAS") {
     textBelum,
   };
 }
-
