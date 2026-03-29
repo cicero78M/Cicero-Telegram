@@ -3,7 +3,11 @@ import { getWebLoginCountsByActor } from '../../../model/loginLogModel.js';
 import { getGreeting } from '../../../utils/utilsHelper.js';
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
-const monthFormatter = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
+const monthFormatter = new Intl.DateTimeFormat('id-ID', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Asia/Jakarta',
+});
 
 function startOfDay(date) {
   const d = new Date(date);
