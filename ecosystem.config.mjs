@@ -1,7 +1,7 @@
 export default {
   apps: [
     {
-      name: 'cicero_v2',
+      name: 'cicero_telegram',
       script: 'app.js',
       env: {
         WA_SERVICE_SKIP_INIT: 'false'
