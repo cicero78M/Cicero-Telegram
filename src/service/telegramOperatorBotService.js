@@ -3,7 +3,8 @@ import oprRequestHandlers from '../handler/menu/oprRequestHandlers.js';
 import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
 import * as clientModel from '../model/clientModel.js';
-import { createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import * as telegramMenuAccessModel from '../model/telegramMenuAccessModel.js';
+import { configureTelegramMenu, createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
 let operatorBot = null;
 let isInitialized = false;
@@ -34,6 +35,12 @@ export async function initializeTelegramOperatorBot(token, enabled = true) {
   try {
     console.log('[Telegram Operator Bot] Initializing operatorBot...');
     operatorBot = new TelegramBot(token, { polling: true });
+    await configureTelegramMenu(operatorBot, [
+      { command: 'start', description: 'Buka beranda operator' },
+      { command: 'menu', description: 'Buka menu operator' },
+      { command: 'request', description: 'Ajukan akses client' },
+      { command: 'help', description: 'Bantuan operator' }
+    ], 'Operator Bot');
     
     // Add sendMessage wrapper to make bot compatible with WhatsApp-style handlers
     const nativeSendMessage = TelegramBot.prototype.sendMessage;
@@ -44,6 +51,7 @@ export async function initializeTelegramOperatorBot(token, enabled = true) {
     
     // Set up message handlers
     setupMessageHandlers();
+    setupAccessCallbackHandlers();
     
     isInitialized = true;
     console.log('[Telegram Operator Bot] Bot initialized successfully');
@@ -102,6 +110,7 @@ function setupCommandHandlers() {
       'Bot ini dapat membantu Anda mengakses menu operator untuk manajemen user, amplifikasi, dan engagement.\n\n' +
       'Gunakan perintah:\n' +
       '/menu - Tampilkan menu operator yang tersedia\n' +
+      '/request - Ajukan izin akses ke satu client/satfung\n' +
       '/help - Tampilkan bantuan';
     
     await operatorBot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
@@ -118,22 +127,29 @@ function setupCommandHandlers() {
       await operatorBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
       return;
     }
-    
     const helpMessage = 
       '📖 *Bantuan Bot Operator Cicero*\n\n' +
       '*Perintah yang tersedia:*\n' +
       '/start - Mulai menggunakan bot\n' +
+      '/request - Ajukan izin akses ke satu client/satfung\n' +
       '/menu - Tampilkan menu operator\n' +
       '/help - Tampilkan pesan bantuan ini\n\n' +
       '*Cara penggunaan:*\n' +
-      '1. Ketik /menu untuk melihat daftar menu operator\n' +
-      '2. Pilih nomor menu yang ingin diakses\n' +
-      '3. Ikuti instruksi dari bot\n\n' +
+      '1. Ketik /request untuk mengajukan akses\n' +
+      '2. Pilih satu client/satfung\n' +
+      '3. Tunggu persetujuan admin Telegram\n' +
+      '4. Setelah disetujui, ketik /menu\n\n' +
+      'Satu akun hanya dapat terhubung ke satu client. Banyak akun dapat memakai client yang sama.\n\n' +
       'Bot ini hanya merespons di *chat private*.';
     
     await operatorBot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
   });
 
+
+  operatorBot.onText(/\/request/, async (msg) => {
+    if (msg.chat.type !== 'private') return;
+    await showAccessRequestMenu(msg.chat.id);
+  });
   // /menu command
   operatorBot.onText(/\/menu/, async (msg) => {
     const chatId = msg.chat.id;
@@ -148,7 +164,8 @@ function setupCommandHandlers() {
     
     try {
       // Fetch all active ORG clients
-      const activeOrgClients = await clientModel.findAllActiveOrgClients();
+      const activeOrgClients = await getAuthorizedClients(msg);
+      if (!activeOrgClients) return;
       
       // Initialize or get user session
       let session = userSessions.get(chatId);
@@ -230,6 +247,13 @@ function setupMessageHandlers() {
     }
     
     try {
+      const authorizedClients = await getAuthorizedClients(msg);
+      if (!authorizedClients) return;
+      session.opr_clients = authorizedClients;
+      if (session.selected_client_id && !authorizedClients.some((client) => client.client_id === session.selected_client_id)) {
+        delete session.selected_client_id;
+        session.step = ["choose_client"][0];
+      }
       // Create a pool-like object that uses the query function
       const pool = { query };
       
@@ -297,3 +321,66 @@ export function getOperatorBot() {
 export function isOperatorBotInitialized() {
   return isInitialized;
 }
+function getAdminChatIds() {
+  const configured = String(process.env.TELEGRAM_OPERATOR_ADMIN_CHAT_IDS || '').split(',').map((id) => id.trim()).filter(Boolean);
+  return configured.filter((id) => id === '1836914805');
+}
+
+function isTelegramAdmin(chatId) {
+  return getAdminChatIds().includes(String(chatId));
+}
+
+async function notifyAccessAdmins(request, client) {
+  const admins = getAdminChatIds();
+  const text = '🔐 *Permintaan Akses Menu Operator*\n\n' + 'User: *' + escapeMarkdown(request.telegram_name || request.telegram_username || request.telegram_chat_id) + '*\n' + 'Chat ID: `' + request.telegram_chat_id + '`\n' + 'Client: *' + escapeMarkdown(client.nama || client.client_id) + '* (`' + client.client_id + '`)\n\nSetujui atau tolak permintaan ini.';
+  if (!admins.length) console.warn('[Telegram Operator Bot] No admin chat IDs configured');
+  for (const adminChatId of admins) await operatorBot.sendMessage(adminChatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '✅ Setujui', callback_data: 'access:approve:' + request.access_id }, { text: '❌ Tolak', callback_data: 'access:reject:' + request.access_id }]] } });
+}
+
+async function showAccessRequestMenu(chatId) {
+  const clients = await clientModel.findAllActiveOrgClients();
+  const keyboard = clients.map((client) => [{ text: '🔑 ' + (client.nama || client.client_id), callback_data: 'access:request:' + client.client_id }]);
+  await operatorBot.sendMessage(chatId, '🔒 *Akses diperlukan*\n\nPilih satfung/client yang ingin digunakan. Permintaan dikirim ke admin Telegram. Setelah disetujui, akun ini hanya dapat mengakses pilihan tersebut.\n\nJumlah user tidak dibatasi.', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } });
+}
+
+async function getAuthorizedClients(msg) {
+  const chatId = msg.chat.id;
+  if (isTelegramAdmin(chatId)) return clientModel.findAllActiveOrgClients();
+  const approved = await telegramMenuAccessModel.findApprovedClients(chatId);
+  if (!approved.length) { await showAccessRequestMenu(chatId); return null; }
+  return approved;
+}
+
+function setupAccessCallbackHandlers() {
+  if (!operatorBot) return;
+  operatorBot.on('callback_query', async (callback) => {
+    const chatId = callback.message && callback.message.chat.id;
+    const parts = String(callback.data || '').split(':');
+    if (parts[0] !== 'access') return;
+    try {
+      if (parts[1] === 'request') {
+        const clientId = parts.slice(2).join(':');
+        const current = await telegramMenuAccessModel.findCurrent(chatId);
+        if (current && current.client_id !== clientId) { await operatorBot.answerCallbackQuery(callback.id, { text: 'Akun Anda sudah terhubung ke client lain.', show_alert: true }); return; }
+        if (current && current.client_id === clientId && current.status === 'approved') { await operatorBot.answerCallbackQuery(callback.id, { text: 'Akses client ini sudah disetujui. Ketik /menu.', show_alert: true }); return; }
+        if (current && current.client_id === clientId && current.status === 'pending') { await operatorBot.answerCallbackQuery(callback.id, { text: 'Permintaan ini masih menunggu persetujuan admin.', show_alert: true }); return; }
+        const client = (await clientModel.findAllActiveOrgClients()).find((item) => item.client_id === clientId);
+        if (!client) throw new Error('Client tidak aktif');
+        const request = await telegramMenuAccessModel.createRequest({ chatId, userId: callback.from.id, username: callback.from.username, name: [callback.from.first_name, callback.from.last_name].filter(Boolean).join(' '), clientId });
+        await notifyAccessAdmins(request, client);
+        await operatorBot.answerCallbackQuery(callback.id, { text: 'Permintaan dikirim ke admin.', show_alert: true });
+        await operatorBot.sendMessage(chatId, '⏳ Permintaan akses *' + escapeMarkdown(client.nama || clientId) + '* menunggu konfirmasi admin.', { parse_mode: 'Markdown' });
+        return;
+      }
+      if (parts[1] === 'approve' || parts[1] === 'reject') {
+        if (!isTelegramAdmin(chatId)) { await operatorBot.answerCallbackQuery(callback.id, { text: 'Hanya admin Telegram yang dapat memproses.', show_alert: true }); return; }
+        const access = await telegramMenuAccessModel.decide(parts.slice(2).join(':'), parts[1] === 'approve' ? 'approved' : 'rejected', chatId);
+        if (!access) { await operatorBot.answerCallbackQuery(callback.id, { text: 'Permintaan sudah diproses.', show_alert: true }); return; }
+        await operatorBot.answerCallbackQuery(callback.id, { text: parts[1] === 'approve' ? 'Akses disetujui.' : 'Akses ditolak.' });
+        await operatorBot.sendMessage(access.telegram_chat_id, parts[1] === 'approve' ? '✅ Akses *' + escapeMarkdown(access.client_id) + '* disetujui. Ketik /menu.' : '❌ Permintaan akses *' + escapeMarkdown(access.client_id) + '* ditolak.', { parse_mode: 'Markdown' });
+        await operatorBot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: callback.message.message_id });
+      }
+    } catch (error) { console.error('[Telegram Operator Bot] Access callback error:', error); await operatorBot.answerCallbackQuery(callback.id, { text: 'Gagal memproses permintaan.', show_alert: true }); }
+  });
+}
+

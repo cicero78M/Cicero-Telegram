@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
 import { findAllActiveDirektoratClients } from '../service/clientService.js';
-import { MESSAGE_SPLIT_CONFIG, escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import { MESSAGE_SPLIT_CONFIG, configureTelegramMenu, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 
 let direktoratBot = null;
 let isInitialized = false;
@@ -34,6 +34,12 @@ export async function initializeTelegramDirektoratBot(token, enabled = true) {
   try {
     console.log('[Telegram Direktorat Bot] Initializing direktoratBot...');
     direktoratBot = new TelegramBot(token, { polling: true });
+    await configureTelegramMenu(direktoratBot, [
+      { command: 'start', description: 'Buka beranda direktorat' },
+      { command: 'menu', description: 'Buka menu direktorat' },
+      { command: 'exit', description: 'Tutup sesi aktif' },
+      { command: 'help', description: 'Bantuan direktorat' }
+    ], 'Direktorat Bot');
     
     // Set up command handlers
     setupCommandHandlers();
@@ -168,6 +174,40 @@ function setupCommandHandlers() {
 function setupMessageHandlers() {
   if (!direktoratBot) return;
 
+  // Native inline buttons; numeric text input remains supported for backward compatibility.
+  direktoratBot.on('callback_query', async (query) => {
+    const chatId = query.message?.chat?.id;
+    const data = query.data || '';
+    if (!chatId || query.message?.chat?.type !== 'private') return;
+    try {
+      await direktoratBot.answerCallbackQuery(query.id);
+      if (data === 'dir:home') {
+        await sendMainMenu(chatId);
+        return;
+      }
+      if (data === 'dir:client') {
+        await showClientSelection(chatId);
+        return;
+      }
+      if (data === 'dir:close') {
+        userSessions.delete(chatId);
+        await direktoratBot.sendMessage(chatId, '✅ Sesi ditutup. Ketik /menu untuk membuka kembali.');
+        return;
+      }
+      if (data.startsWith('dir:client:')) {
+        const index = Number(data.slice('dir:client:'.length));
+        await handleClientSelection(chatId, String(index + 1), query.from);
+        return;
+      }
+      if (data.startsWith('dir:menu:')) {
+        await handleMenuSelection(chatId, data.slice('dir:menu:'.length), query.from);
+      }
+    } catch (error) {
+      console.error('[Telegram Direktorat Bot] Callback handling failed:', error);
+      await direktoratBot.sendMessage(chatId, '❌ Permintaan tidak dapat diproses. Silakan gunakan /menu lagi.');
+    }
+  });
+
   // Handle all text messages that are not commands
   direktoratBot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -205,39 +245,29 @@ function setupMessageHandlers() {
  * @param {number} chatId - Telegram chat ID
  */
 async function sendMainMenu(chatId) {
-  const menuText = 
-    '📋 *Menu DirRequest*\n\n' +
-    'Pilih menu yang ingin Anda akses:\n\n' +
-    
-    '*📊 Laporan Dasar (1-3)*\n' +
-    '1️⃣ Recap data user\n' +
-    '2️⃣ Executive summary\n' +
-    '3️⃣ Laporan data tidak lengkap\n\n' +
-    
-    '*👥 Laporan Instagram/Likes (5-7, 12-13, 19)*\n' +
-    '5️⃣ Absensi likes Ditbinmas (lengkap)\n' +
-    '6️⃣ Absensi likes Ditbinmas (sederhana)\n' +
-    '7️⃣ Absensi likes semua personel\n' +
-    '1️⃣2️⃣ Fetch & recap konten Instagram + likes\n' +
-    '1️⃣3️⃣ Fetch likes Instagram saja\n' +
-    '1️⃣9️⃣ Likes recap Excel\n\n' +
-    
-    '*💬 Laporan TikTok/Komentar (8-10, 14-15, 20)*\n' +
-    '8️⃣ Absensi komentar TikTok\n' +
-    '9️⃣ Absensi komentar Ditbinmas (sederhana)\n' +
-    '1️⃣0️⃣ Absensi komentar Ditbinmas (lengkap)\n' +
-    '1️⃣4️⃣ Fetch & recap konten TikTok + komentar\n' +
-    '1️⃣5️⃣ Fetch komentar TikTok saja\n' +
-    '2️⃣0️⃣ Comment recap Excel\n\n' +
-    
-    '*📈 Laporan Lainnya*\n' +
-    '4️⃣ Satker update matrix Excel\n' +
-    '2️⃣2️⃣ Engagement ranking Excel\n' +
-    '3️⃣0️⃣ Laporan Kasatker\n\n' +
-    'Ketik nomor menu untuk mengaksesnya.\n' +
-    'Contoh: ketik "1" untuk menu 1';
-  
-  await direktoratBot.sendMessage(chatId, menuText, { parse_mode: 'Markdown' });
+  const groups = [
+    ['📊 Rekap Data', [['1', 'Kelengkapan personel'], ['2', 'Executive summary'], ['3', 'Data personel'], ['4', 'Matriks update satker']]],
+    ['📅 Absensi', [['5', 'Like direktorat/bidang'], ['6', 'Instagram simple'], ['7', 'Like Instagram'], ['8', 'Komentar TikTok'], ['9', 'TikTok simple'], ['10', 'Komentar direktorat/bidang'], ['11', 'User dashboard'], ['48', 'Instagram jajaran'], ['49', 'TikTok jajaran'], ['55', 'IG jajaran per post'], ['56', 'TikTok jajaran per post']]],
+    ['📥 Pengambilan Data', [['12', 'Konten & like Instagram'], ['13', 'Like Instagram'], ['14', 'Konten & komentar TikTok'], ['15', 'Komentar TikTok'], ['16', 'Semua sosmed & tugas'], ['46', 'Input IG manual'], ['47', 'Input TikTok manual'], ['50', 'Fetch like IG manual'], ['51', 'Fetch komentar TikTok manual'], ['52', 'Fetch komentar IG manual'], ['53', 'Hapus post tugas']]],
+    ['📝 Laporan', [['17', 'Laporan harian Instagram'], ['18', 'Laporan harian TikTok'], ['19', 'Rekap like Instagram'], ['20', 'Rekap komentar TikTok'], ['21', 'Rekap gabungan'], ['22', 'Ranking engagement'], ['23', 'Instagram mingguan'], ['24', 'TikTok mingguan'], ['25', 'TikTok top/bottom'], ['26', 'Instagram top/bottom'], ['27', 'Instagram bulanan'], ['57', 'TikTok bulanan'], ['28', 'Like IG per konten'], ['29', 'Komentar TikTok per konten'], ['42', 'Instagram all data'], ['43', 'TikTok all data']]],
+    ['🛡️ Monitoring Kasatker', [['30', 'Laporan Kasatker'], ['31', 'Ranking personel'], ['32', 'Ranking Polres'], ['33', 'Absensi Kasatker'], ['34', 'Absensi like Kasat Binmas'], ['35', 'Absensi komentar Kasat Binmas'], ['44', 'Like Kasat Binmas Excel'], ['45', 'Komentar Kasat Binmas Excel']]],
+    ['📡 Satbinmas Official', [['36', 'Metadata IG harian'], ['37', 'Konten IG semua akun ORG'], ['38', 'Sinkron secUid TikTok'], ['39', 'Konten TikTok semua akun ORG'], ['40', 'Rekap Instagram'], ['41', 'Rekap TikTok']]],
+  ];
+  const menuText = ['📋 *Menu Direktorat*', '', 'Pilih layanan. Gunakan tombol untuk navigasi cepat atau kirim nomor menu.', ''].concat(
+    groups.flatMap(([title, items]) => [`*${title}*`, ...items.map(([code, label]) => `${code} — ${label}`), ''])
+  ).join('\n');
+  const buttons = groups.flatMap(([, items]) => items.map(([code, label]) => ({
+    text: `${code} · ${label}`,
+    callback_data: `dir:menu:${code}`,
+  })));
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
+  rows.push([{ text: '🔄 Pilih client', callback_data: 'dir:client' }, { text: '❌ Tutup', callback_data: 'dir:close' }]);
+  await direktoratBot.sendMessage(chatId, menuText, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: rows },
+  });
 }
 
 /**
@@ -279,7 +309,15 @@ async function showClientSelection(chatId) {
       clients: clients
     });
     
-    await direktoratBot.sendMessage(chatId, clientMenu, { parse_mode: 'Markdown' });
+    const keyboard = clients.map((client, index) => [{
+      text: String(index + 1) + ' · ' + client.client_id + (client.nama ? ' — ' + client.nama : ''),
+      callback_data: 'dir:client:' + index,
+    }]);
+    keyboard.push([{ text: '↩️ Kembali ke menu', callback_data: 'dir:home' }]);
+    await direktoratBot.sendMessage(chatId, clientMenu, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard },
+    });
   } catch (error) {
     console.error('[Telegram Bot] Error showing client selection:', error);
     // Fallback to default client on error

@@ -51,18 +51,18 @@ export async function findPostByVideoId(video_id) {
  * @param {string} video_id
  * @returns {Promise<number>}
  */
-export async function deletePostByVideoId(video_id) {
+export async function deletePostByVideoId(video_id, clientId = null) {
   const normalizedVideoId = (video_id || "").trim();
-  if (!normalizedVideoId) {
+  const normalizedClientId = String(clientId || "").trim();
+  if (!normalizedVideoId || !normalizedClientId) {
     return 0;
   }
   const res = await query(
-    `DELETE FROM tiktok_post WHERE video_id = $1`,
-    [normalizedVideoId]
+    `DELETE FROM tiktok_post WHERE video_id = $1 AND LOWER(TRIM(client_id)) = LOWER(TRIM($2))`,
+    [normalizedVideoId, normalizedClientId]
   );
   return res.rowCount || 0;
 }
-
 /**
  * Simpan/update satu atau banyak post TikTok (array of objects)
  * @param {string} client_id

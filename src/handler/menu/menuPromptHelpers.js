@@ -1,5 +1,5 @@
 export const SUBMENU_BACK_INSTRUCTION =
-  "Ketik *back* untuk kembali ke menu sebelumnya.";
+  "↩️ Ketik back untuk kembali ke menu sebelumnya.";
 
 export const appendSubmenuBackInstruction = (message) => {
   if (!message) {

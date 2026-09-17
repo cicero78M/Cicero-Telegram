@@ -14,6 +14,181 @@ function ignore(..._args) {}
 
 const OPERATOR_ROLE = "operator";
 
+function buildJakartaDateContext(referenceDate = new Date()) {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(referenceDate);
+  const value = (type) => parts.find((part) => part.type === type)?.value || "-";
+  return {
+    hari: value("weekday"),
+    tanggal: value("day") + "/" + value("month") + "/" + value("year"),
+    jam: value("hour") + ":" + value("minute") + ":" + value("second"),
+  };
+}
+
+function extractInstagramLinksFromInput(text) {
+  return String(text || "")
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter((item) => item && /^https?:\/\//i.test(item) && /instagram\.com/i.test(item));
+}
+
+function extractEngagementManualLinksFromInput(text) {
+  const rawText = String(text || "");
+  const urlMatches = rawText.match(/https?:\/\/[^\s<>"']+/gi) || [];
+  const instagramLinks = [];
+  const tiktokLinks = [];
+  const seenInstagram = new Set();
+  const seenTiktok = new Set();
+  let ignoredUrlCount = 0;
+
+  for (const rawUrl of urlMatches) {
+    const cleanedUrl = String(rawUrl).replace(/[),.;!?]+$/g, "");
+    const dedupeKey = cleanedUrl.toLowerCase();
+
+    if (/instagram\.com\/(p|reel|tv)\//i.test(cleanedUrl)) {
+      if (!seenInstagram.has(dedupeKey)) {
+        seenInstagram.add(dedupeKey);
+        instagramLinks.push(cleanedUrl);
+      }
+      continue;
+    }
+
+    if (/(?:tiktok\.com|vt\.tiktok\.com|vm\.tiktok\.com)\//i.test(cleanedUrl)) {
+      if (!seenTiktok.has(dedupeKey)) {
+        seenTiktok.add(dedupeKey);
+        tiktokLinks.push(cleanedUrl);
+      }
+      continue;
+    }
+
+    ignoredUrlCount += 1;
+  }
+
+  return {
+    instagramLinks,
+    tiktokLinks,
+    ignoredUrlCount,
+  };
+}
+
+function extractInstagramShortcodeFromLink(link) {
+  const sanitizedLink = String(link || "").trim();
+  if (!sanitizedLink) return "";
+  const match = sanitizedLink.match(/instagram\.com\/(?:p|reel|tv)\/([^/?#]+)/i);
+  return match?.[1] ? String(match[1]).trim() : "";
+}
+
+function extractTiktokVideoIdFromLink(link) {
+  const sanitizedLink = String(link || "").trim();
+  if (!sanitizedLink) return "";
+  const match = sanitizedLink.match(/video\/(\d{8,21})/i);
+  return match?.[1] ? String(match[1]).trim() : "";
+}
+
+function extractEngagementDeleteTargetsFromInput(text) {
+  const { instagramLinks, tiktokLinks, ignoredUrlCount } =
+    extractEngagementManualLinksFromInput(text);
+  const instagramShortcodes = [];
+  const tiktokVideoIds = [];
+  const invalidLinks = [];
+
+  for (const instagramLink of instagramLinks) {
+    const shortcode = extractInstagramShortcodeFromLink(instagramLink);
+    if (shortcode) {
+      instagramShortcodes.push({ shortcode, sourceLink: instagramLink });
+    } else {
+      invalidLinks.push(instagramLink);
+    }
+  }
+
+  for (const tiktokLink of tiktokLinks) {
+    const videoId = extractTiktokVideoIdFromLink(tiktokLink);
+    if (videoId) {
+      tiktokVideoIds.push({ videoId, sourceLink: tiktokLink });
+    } else {
+      invalidLinks.push(tiktokLink);
+    }
+  }
+
+  return {
+    instagramShortcodes,
+    tiktokVideoIds,
+    invalidLinks,
+    ignoredUrlCount,
+  };
+}
+
+function buildTiktokTaskLink(videoId, tiktokUsername) {
+  const normalizedVideoId = String(videoId || "").trim();
+  if (!normalizedVideoId) return null;
+
+  const normalizedUsername = String(tiktokUsername || "").replace(/^@/, "").trim();
+  if (normalizedUsername) {
+    return `https://www.tiktok.com/@${normalizedUsername}/video/${normalizedVideoId}`;
+  }
+  return `https://www.tiktok.com/video/${normalizedVideoId}`;
+}
+
+async function sendTodayEngagementTasks(session, chatId, waClient, pool) {
+  const client = await resolveClientProfile(session, chatId, pool);
+  if (!client) {
+    await waClient.sendMessage(chatId, "❌ Client tidak ditemukan untuk nomor ini.");
+    return;
+  }
+
+  const { getShortcodesTodayByClient } = await import("../../model/instaPostModel.js");
+  const { getPostsTodayByClient } = await import(
+    "../../model/tiktokPostModel.js"
+  );
+
+  const [instagramShortcodes, tiktokPosts] = await Promise.all([
+    getShortcodesTodayByClient(client.client_id),
+    getPostsTodayByClient(client.client_id),
+  ]);
+
+  const { getTaskPostExclusionSet } = await import(
+    "../../model/taskPostExclusionModel.js"
+  );
+  const [excludedInstagram, excludedTiktok] = await Promise.all([
+    getTaskPostExclusionSet({ clientId: client.client_id, platform: "instagram" }),
+    getTaskPostExclusionSet({ clientId: client.client_id, platform: "tiktok" }),
+  ]);
+
+  const instagramLinks = instagramShortcodes
+    .filter((shortcode) => !excludedInstagram.has(String(shortcode).trim()))
+    .map((shortcode) => `https://www.instagram.com/p/${shortcode}`);
+  const tiktokLinks = tiktokPosts
+    .filter((post) => !excludedTiktok.has(String(post?.video_id || "").trim()))
+    .map((post) => buildTiktokTaskLink(post?.video_id, client.client_tiktok))
+    .filter(Boolean);
+
+  const dateContext = buildJakartaDateContext();
+  const lines = ["*Tugas Hari Ini*", `Client: *${client.client_id}*`, `Hari: *${dateContext.hari}*`, `Tanggal: *${dateContext.tanggal}*`, `Waktu pengambilan data: *${dateContext.jam} WIB*`, ""];
+
+  if (!instagramLinks.length && !tiktokLinks.length) {
+    lines.push("Tidak ada tugas engagement hari ini.");
+  } else {
+    lines.push("Link tugas yang harus dilaksanakan hari ini:");
+    lines.push("");
+    lines.push(`Instagram (${instagramLinks.length}):`);
+    lines.push(instagramLinks.join("\n") || "-");
+    lines.push("");
+    lines.push(`TikTok (${tiktokLinks.length}):`);
+    lines.push(tiktokLinks.join("\n") || "-");
+  }
+
+  await waClient.sendMessage(chatId, appendSubmenuBackInstruction(lines.join("\n").trim()));
+}
+
 function normalizeAccessNumbers(rawNumber) {
   const digitsOnly = String(rawNumber || "").replace(/\D/g, "");
   if (!digitsOnly) return [];
@@ -61,7 +236,37 @@ async function isSuperAdmin(chatId, pool) {
   }
 }
 
+async function resolveApprovedTelegramClient(session, chatId, pool) {
+  try {
+    const { findApprovedClients } = await import("../../model/telegramMenuAccessModel.js");
+    const approvedClients = await findApprovedClients(chatId);
+    if (!approvedClients.length) return null;
+
+    const selected = session.selected_client_id
+      ? approvedClients.find((client) =>
+          String(client.client_id).toLowerCase() === String(session.selected_client_id).toLowerCase()
+        )
+      : approvedClients[0];
+
+    if (!selected) return null;
+
+    const { rows } = await pool.query(
+      "SELECT * FROM clients WHERE LOWER(client_id) = LOWER($1) LIMIT 1",
+      [selected.client_id]
+    );
+    const client = rows[0] || null;
+    if (client) session.selected_client_id = client.client_id;
+    return client;
+  } catch (error) {
+    console.error("Error resolving approved Telegram client:", error);
+    return null;
+  }
+}
+
 async function resolveClientProfile(session, chatId, pool) {
+  const approvedTelegramClient = await resolveApprovedTelegramClient(session, chatId, pool);
+  if (approvedTelegramClient) return approvedTelegramClient;
+
   if (session.selected_client_id) {
     const { rows } = await pool.query(
       "SELECT * FROM clients WHERE LOWER(client_id) = LOWER($1) LIMIT 1",
@@ -190,6 +395,9 @@ async function ensureEngagementMenuAccess(
 }
 
 async function resolveClientId(session, chatId, pool) {
+  const approvedTelegramClient = await resolveApprovedTelegramClient(session, chatId, pool);
+  if (approvedTelegramClient) return approvedTelegramClient.client_id;
+
   if (session.selected_client_id) {
     return session.selected_client_id;
   }
@@ -226,7 +434,7 @@ async function resolveClientId(session, chatId, pool) {
 
 function formatUpdateFieldList() {
   return appendSubmenuBackInstruction(`
-✏️ *Pilih field yang ingin diupdate:*
+✏️ *✏️ PILIH FIELD YANG INGIN DIUPDATE:*
 1. Nama
 2. Pangkat
 3. Satfung
@@ -247,7 +455,7 @@ function formatClientSelectionMessage(clients) {
     })
     .join("\n");
   return appendSubmenuBackInstruction(
-    `*Pilih client (tipe Org) untuk Menu Operator:*\n${items}\n\nBalas *nomor* atau *client_id* untuk melanjutkan, atau *batal* untuk keluar.`
+    `🏢 PILIH CLIENT UNTUK MENU OPERATOR:\n${items}\n\nBalas nomor atau client_id untuk melanjutkan, atau batal untuk keluar.`
   );
 }
 
@@ -271,20 +479,20 @@ export const oprRequestHandlers = {
     let menuNumber = 1;
     
     // Manajemen User - always shown for ORG clients
-    menuItems.push(`${menuNumber}️⃣ Manajemen User`);
+    menuItems.push(`${menuNumber}️⃣ Manajemen User 👥`);
     menuMapping[menuNumber] = 'user';
     menuNumber++;
     
     // Manajemen Amplifikasi (Diseminasi) - only if client_status AND client_amplify_status
     if (client && client.client_status && client.client_amplify_status) {
-      menuItems.push(`${menuNumber}️⃣ Manajemen Amplifikasi`);
+      menuItems.push(`${menuNumber}️⃣ Manajemen Amplifikasi 📣`);
       menuMapping[menuNumber] = 'amplifikasi';
       menuNumber++;
     }
     
     // Manajemen Engagement - only if client_status AND (instagram OR tiktok)
     if (client && client.client_status && (client.client_insta_status || client.client_tiktok_status)) {
-      menuItems.push(`${menuNumber}️⃣ Manajemen Engagement`);
+      menuItems.push(`${menuNumber}️⃣ Manajemen Engagement 📊`);
       menuMapping[menuNumber] = 'engagement';
       menuNumber++;
     }
@@ -293,12 +501,12 @@ export const oprRequestHandlers = {
     session.menuMapping = menuMapping;
     
     const msg =
-      `┏━━━ *MENU OPERATOR CICERO* ━━━┓
+      `┏━━━ 🤖 MENU OPERATOR CICERO ━━━┓
 👮‍♂️  Akses khusus operator client.
 
 ${menuItems.join('\n')}
 
-Ketik *angka menu* di atas, atau *batal* untuk keluar.
+🔢 Balas nomor menu di atas, atau ketik 🚫 batal untuk keluar.
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━┛`;
     session.step = "chooseMenuGroup";
     await waClient.sendMessage(chatId, appendSubmenuBackInstruction(msg));
@@ -408,7 +616,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         await waClient.sendMessage(
           chatId,
           appendSubmenuBackInstruction(
-            `*Menu Manajemen User*\n1️⃣ Tambah user baru\n2️⃣ Perbarui data user\n3️⃣ Ubah status user (aktif/nonaktif)\n4️⃣ Cek data user (NRP/NIP)\n5️⃣ Absensi registrasi user\n6️⃣ Absensi update data username\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+            `👥 MENU MANAJEMEN USER\n1️⃣ Tambah user baru\n2️⃣ Perbarui data user\n3️⃣ Ubah status user (aktif/nonaktif)\n4️⃣ Cek data user (NRP/NIP)\n5️⃣ Absensi registrasi user\n6️⃣ Absensi update data username\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
           )
         );
         return;
@@ -428,7 +636,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         await waClient.sendMessage(
           chatId,
           appendSubmenuBackInstruction(
-            `*Menu Manajemen Amplifikasi*\n1️⃣ Tugas Amplifikasi\n2️⃣ Laporan Amplifikasi\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+            `📣 MENU MANAJEMEN AMPLIFIKASI\n1️⃣ Tugas Amplifikasi\n2️⃣ Laporan Amplifikasi\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
           )
         );
         return;
@@ -451,16 +659,16 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
         }
         const { instagramActive, tiktokActive } = engagementAccess;
         const instaLabel = instagramActive
-          ? "1️⃣ Absensi Likes Instagram"
-          : "1️⃣ Absensi Likes Instagram (nonaktif)";
+          ? "1️⃣  📷 Instagram Likes"
+          : "1️⃣  📷 Instagram Likes · nonaktif";
         const tiktokLabel = tiktokActive
-          ? "2️⃣ Absensi Komentar TikTok"
-          : "2️⃣ Absensi Komentar TikTok (nonaktif)";
+          ? "2️⃣  🎵 TikTok Komentar"
+          : "2️⃣  🎵 TikTok Komentar · nonaktif";
         session.step = "kelolaEngagement_menu";
         await waClient.sendMessage(
           chatId,
           appendSubmenuBackInstruction(
-            `*Menu Manajemen Engagement*\n${instaLabel}\n${tiktokLabel}\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+            `📊 MENU ENGAGEMENT\n\n${instaLabel}\n${tiktokLabel}\n3️⃣  📅 Tugas Hari Ini\n4️⃣  🔗 Input Multi-Link\n5️⃣  🗑️ Hapus Multi-Link Tugas\n\n📌 Balas nomor menu yang tersedia\n↩️ Ketik menu untuk kembali\n🚫 Ketik batal untuk keluar.`
           )
         );
         return;
@@ -472,7 +680,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     const maxMenuNumber = menuNumbers.length > 0 ? Math.max(...menuNumbers) : 1;
     await waClient.sendMessage(
       chatId,
-      `Menu tidak dikenal. Balas angka 1-${maxMenuNumber} atau ketik *batal* untuk keluar.`
+      `Menu tidak dikenal. 🔎 Balas angka 1-${maxMenuNumber} atau ketik 🚫 batal untuk keluar.`
     );
   },
 
@@ -499,7 +707,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       session.step = "addUser_nrp";
       await waClient.sendMessage(
         chatId,
-        "➕ *Tambah User Baru*\nMasukkan NRP/NIP (belum terdaftar):"
+        "➕ Tambah User Baru\nMasukkan NRP/NIP (belum terdaftar):"
       );
       return;
     }
@@ -508,7 +716,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       session.step = "updateData_nrp";
       await waClient.sendMessage(
         chatId,
-        "✏️ *Update Data User*\nMasukkan NRP/NIP user yang ingin diupdate:"
+        "✏️ Update Data User\nMasukkan NRP/NIP user yang ingin diupdate:"
       );
       return;
     }
@@ -517,7 +725,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       session.step = "updateStatus_nrp";
       await waClient.sendMessage(
         chatId,
-        "🟢🔴 *Ubah Status User*\nMasukkan NRP/NIP user yang ingin diubah statusnya:"
+        "🟢🔴 Ubah Status User\nMasukkan NRP/NIP user yang ingin diubah statusnya:"
       );
       return;
     }
@@ -537,7 +745,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       session.step = "cekUser_nrp";
       await waClient.sendMessage(
         chatId,
-        "🔍 *Cek Data User*\nMasukkan NRP/NIP user yang ingin dicek:"
+        "🔍 Cek Data User\nMasukkan NRP/NIP user yang ingin dicek:"
       );
       return;
     }
@@ -582,79 +790,357 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-6, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-6, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
   kelolaEngagement_menu: async (session, chatId, text, waClient, pool, userModel) => {
-    if (/^(menu|kembali|back|0)$/i.test(text.trim())) {
+    const menuText = (text || "").trim();
+    const menuMapping = session.engagementMenuMapping || {
+      1: "likes",
+      2: "komentar",
+      3: "tugas_hari_ini",
+      4: "manual_multi_link",
+      5: "hapus_multi_link_tugas",
+    };
+
+    if (/^(menu|kembali|back|0)$/i.test(menuText)) {
+      delete session.engagementMenuMapping;
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
-    if (/^(batal|cancel|exit)$/i.test(text.trim())) {
+    if (/^(batal|cancel|exit)$/i.test(menuText)) {
       session.menu = null;
       session.step = null;
+      delete session.engagementMenuMapping;
       delete session.absensi_engagement_client_id;
       delete session.absensi_engagement_type;
       await waClient.sendMessage(chatId, "❎ Keluar dari menu operator.");
       return;
     }
-    if (/^1$/i.test(text.trim())) {
+
+    const selectedMenu = menuMapping[Number.parseInt(menuText, 10)];
+    if (selectedMenu === "likes" || selectedMenu === "komentar") {
       const access = await ensureEngagementMenuAccess(
         session,
         chatId,
         waClient,
         pool,
-        { platform: "instagram" }
+        { platform: selectedMenu === "likes" ? "instagram" : "tiktok" }
       );
       if (!access) {
-        if (await isSuperAdmin(chatId, pool)) {
-          delete session.selected_client_id;
-        }
+        if (await isSuperAdmin(chatId, pool)) delete session.selected_client_id;
         session.step = "main";
         return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
       }
       session.step = "absensiEngagement_submenu";
-      session.absensi_engagement_type = "likes";
+      session.absensi_engagement_type = selectedMenu;
       return oprRequestHandlers.absensiEngagement_submenu(
-        session,
-        chatId,
-        text,
-        waClient,
-        pool,
-        userModel
+        session, chatId, menuText, waClient, pool, userModel
       );
     }
-    if (/^2$/i.test(text.trim())) {
-      const access = await ensureEngagementMenuAccess(
-        session,
-        chatId,
-        waClient,
-        pool,
-        { platform: "tiktok" }
-      );
+
+    if (selectedMenu === "tugas_hari_ini") {
+      const access = await ensureEngagementMenuAccess(session, chatId, waClient, pool);
       if (!access) {
-        if (await isSuperAdmin(chatId, pool)) {
-          delete session.selected_client_id;
-        }
+        if (await isSuperAdmin(chatId, pool)) delete session.selected_client_id;
         session.step = "main";
         return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
       }
-      session.step = "absensiEngagement_submenu";
-      session.absensi_engagement_type = "komentar";
-      return oprRequestHandlers.absensiEngagement_submenu(
-        session,
-        chatId,
-        text,
-        waClient,
-        pool,
-        userModel
-      );
+      await sendTodayEngagementTasks(session, chatId, waClient, pool);
+      return;
     }
+
+    if (selectedMenu === "manual_multi_link" || selectedMenu === "hapus_multi_link_tugas") {
+      const access = await ensureEngagementMenuAccess(session, chatId, waClient, pool);
+      if (!access) {
+        if (await isSuperAdmin(chatId, pool)) delete session.selected_client_id;
+        session.step = "main";
+        return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+      }
+      session.step = selectedMenu === "manual_multi_link"
+        ? "kelolaEngagement_inputManualMultiLink"
+        : "kelolaEngagement_hapusManualMultiLink";
+      const prompt = selectedMenu === "manual_multi_link"
+        ? "🔗 INPUT MULTI-LINK\n\nKirim satu atau beberapa link Instagram/TikTok.\nBoleh dicampur dan dipisah spasi atau baris baru.\n\n↩️ menu = kembali\n✖️ batal = keluar"
+        : "🗑️ HAPUS MULTI-LINK TUGAS\n\nKirim link Instagram/TikTok yang ingin dikeluarkan dari tugas hari ini.\nBoleh dikirim sekaligus dengan spasi atau baris baru.\n\n↩️ menu = kembali\n✖️ batal = keluar";
+      await waClient.sendMessage(chatId, appendSubmenuBackInstruction(prompt));
+      return;
+    }
+
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-2, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "⚠️ Pilihan tidak tersedia. Gunakan nomor 1-5.\n\n↩️ menu = kembali\n✖️ batal = keluar"
     );
+  },
+
+  kelolaEngagement_inputManualMultiLink: async (
+    session,
+    chatId,
+    text,
+    waClient,
+    pool,
+    userModel
+  ) => {
+    const trimmedText = (text || "").trim();
+
+    if (/^(menu|kembali|back|0)$/i.test(trimmedText)) {
+      session.step = "kelolaEngagement_menu";
+      return oprRequestHandlers.kelolaEngagement_menu(
+        session,
+        chatId,
+        "",
+        waClient,
+        pool,
+        userModel
+      );
+    }
+
+    if (/^(batal|cancel|exit)$/i.test(trimmedText)) {
+      session.menu = null;
+      session.step = null;
+      delete session.engagementMenuMapping;
+      delete session.absensi_engagement_client_id;
+      delete session.absensi_engagement_type;
+      await waClient.sendMessage(chatId, "❎ Keluar dari menu operator.");
+      return;
+    }
+
+    const clientId = await resolveClientId(session, chatId, pool);
+    if (!clientId) {
+      await waClient.sendMessage(chatId, "❌ Client tidak ditemukan untuk nomor ini.");
+      session.step = "main";
+      return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+    }
+
+    const { instagramLinks, tiktokLinks, ignoredUrlCount } =
+      extractEngagementManualLinksFromInput(trimmedText);
+
+    if (!instagramLinks.length && !tiktokLinks.length) {
+      await waClient.sendMessage(
+        chatId,
+        "❌ Tidak ada link Instagram/TikTok yang valid. Kirim ulang link valid atau ketik menu untuk kembali."
+      );
+      return;
+    }
+
+    await waClient.sendMessage(chatId, "⏳ Proses input manual multi-link dimulai.");
+
+    try {
+      const instagramSuccess = [];
+      const instagramFailed = [];
+      const tiktokSuccess = [];
+      const tiktokFailed = [];
+
+      if (instagramLinks.length) {
+        const { fetchSinglePostKhusus } = await import("../fetchpost/instaFetchPost.js");
+        for (const instagramLink of instagramLinks) {
+          try {
+            const result = await fetchSinglePostKhusus(instagramLink, clientId);
+            instagramSuccess.push(result.shortcode);
+          } catch (error) {
+            instagramFailed.push(`- ${instagramLink} => ${error.message}`);
+          }
+        }
+      }
+
+      if (tiktokLinks.length) {
+        const { fetchAndStoreSingleTiktokPost } = await import(
+          "../fetchpost/tiktokFetchPost.js"
+        );
+        for (const tiktokLink of tiktokLinks) {
+          try {
+            const result = await fetchAndStoreSingleTiktokPost(clientId, tiktokLink);
+            tiktokSuccess.push(result.videoId);
+          } catch (error) {
+            tiktokFailed.push(`- ${tiktokLink} => ${error.message}`);
+          }
+        }
+      }
+
+      if (instagramSuccess.length) {
+        const { handleFetchLikesInstagram } = await import(
+          "../fetchengagement/fetchLikesInstagram.js"
+        );
+        await handleFetchLikesInstagram(waClient, chatId, clientId, {
+          shortcodes: instagramSuccess,
+          sourceType: "manual_input",
+        });
+      }
+
+      if (tiktokSuccess.length) {
+        const { handleFetchKomentarTiktokBatch } = await import(
+          "../fetchengagement/fetchCommentTiktok.js"
+        );
+        await handleFetchKomentarTiktokBatch(waClient, chatId, clientId, {
+          videoIds: tiktokSuccess,
+          sourceType: "manual_input",
+        });
+      }
+
+      const summaryLines = [
+        "✅ Proses input manual multi-link selesai.",
+        `• Instagram berhasil: ${instagramSuccess.length}`,
+        `• TikTok berhasil: ${tiktokSuccess.length}`,
+      ];
+      if (ignoredUrlCount > 0) {
+        summaryLines.push(`• Link non-IG/TikTok diabaikan: ${ignoredUrlCount}`);
+      }
+      await waClient.sendMessage(chatId, summaryLines.join("\n"));
+
+      if (instagramFailed.length || tiktokFailed.length) {
+        await waClient.sendMessage(
+          chatId,
+          [
+            "⚠️ Sebagian link gagal diproses:",
+            ...instagramFailed,
+            ...tiktokFailed,
+          ].join("\n")
+        );
+      }
+    } catch (error) {
+      await waClient.sendMessage(chatId, `❌ Gagal memproses input manual: ${error.message}`);
+    }
+
+    session.step = "main";
+    return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+  },
+
+  kelolaEngagement_hapusManualMultiLink: async (
+    session,
+    chatId,
+    text,
+    waClient,
+    pool,
+    userModel
+  ) => {
+    const trimmedText = (text || "").trim();
+
+    if (/^(menu|kembali|back|0)$/i.test(trimmedText)) {
+      session.step = "kelolaEngagement_menu";
+      return oprRequestHandlers.kelolaEngagement_menu(
+        session,
+        chatId,
+        "",
+        waClient,
+        pool,
+        userModel
+      );
+    }
+
+    if (/^(batal|cancel|exit)$/i.test(trimmedText)) {
+      session.menu = null;
+      session.step = null;
+      delete session.engagementMenuMapping;
+      delete session.absensi_engagement_client_id;
+      delete session.absensi_engagement_type;
+      await waClient.sendMessage(chatId, "❎ Keluar dari menu operator.");
+      return;
+    }
+
+    const clientId = await resolveClientId(session, chatId, pool);
+    if (!clientId) {
+      await waClient.sendMessage(chatId, "❌ Client tidak ditemukan untuk nomor ini.");
+      session.step = "main";
+      return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+    }
+
+    const { instagramShortcodes, tiktokVideoIds, invalidLinks, ignoredUrlCount } =
+      extractEngagementDeleteTargetsFromInput(trimmedText);
+
+    if (!instagramShortcodes.length && !tiktokVideoIds.length) {
+      await waClient.sendMessage(
+        chatId,
+        "❌ Tidak ada link Instagram/TikTok yang valid. Kirim ulang link valid atau ketik *menu* untuk kembali."
+      );
+      return;
+    }
+
+    await waClient.sendMessage(chatId, "⏳ Proses hapus multi-link tugas dimulai.");
+
+    try {
+      const { addTaskPostExclusion } = await import("../../model/taskPostExclusionModel.js");
+      const { deletePostByShortcode } = await import("../../model/instaPostModel.js");
+      const { deletePostByVideoId } = await import("../../model/tiktokPostModel.js");
+
+      let instagramDeletedCount = 0;
+      let tiktokDeletedCount = 0;
+      const instagramFailures = [];
+      const tiktokFailures = [];
+
+      for (const { shortcode, sourceLink } of instagramShortcodes) {
+        try {
+          await addTaskPostExclusion({
+            clientId,
+            platform: "instagram",
+            contentId: shortcode,
+            sourceLink,
+          });
+          const deletedRows = await deletePostByShortcode(shortcode, clientId);
+          instagramDeletedCount += deletedRows;
+        } catch (error) {
+          instagramFailures.push(`- ${sourceLink} => ${error.message}`);
+        }
+      }
+
+      for (const { videoId, sourceLink } of tiktokVideoIds) {
+        try {
+          await addTaskPostExclusion({
+            clientId,
+            platform: "tiktok",
+            contentId: videoId,
+            sourceLink,
+          });
+          const deletedRows = await deletePostByVideoId(videoId, clientId);
+          tiktokDeletedCount += deletedRows;
+        } catch (error) {
+          tiktokFailures.push(`- ${sourceLink} => ${error.message}`);
+        }
+      }
+
+      const summaryLines = [
+        "✅ Proses hapus multi-link tugas selesai.",
+        `Client: *${clientId}*`,
+        "",
+        `Instagram diproses: ${instagramShortcodes.length} link`,
+        `- Berhasil ditandai hapus tugas: ${
+          instagramShortcodes.length - instagramFailures.length
+        }`,
+        `- Baris insta_post terhapus: ${instagramDeletedCount}`,
+        "",
+        `TikTok diproses: ${tiktokVideoIds.length} link`,
+        `- Berhasil ditandai hapus tugas: ${tiktokVideoIds.length - tiktokFailures.length}`,
+        `- Baris tiktok_post terhapus: ${tiktokDeletedCount}`,
+      ];
+
+      if (ignoredUrlCount > 0) {
+        summaryLines.push("", `⚠️ URL non-Instagram/TikTok diabaikan: ${ignoredUrlCount}`);
+      }
+      if (invalidLinks.length > 0) {
+        summaryLines.push("", `⚠️ Link tidak valid: ${invalidLinks.length}`);
+      }
+      if (instagramFailures.length > 0) {
+        summaryLines.push(
+          "",
+          `⚠️ Gagal memproses ${instagramFailures.length} link Instagram:`,
+          ...instagramFailures
+        );
+      }
+      if (tiktokFailures.length > 0) {
+        summaryLines.push(
+          "",
+          `⚠️ Gagal memproses ${tiktokFailures.length} link TikTok:`,
+          ...tiktokFailures
+        );
+      }
+
+      await waClient.sendMessage(chatId, summaryLines.join("\n"));
+    } catch (error) {
+      await waClient.sendMessage(chatId, `❌ Gagal hapus multi-link tugas: ${error.message}`);
+    }
+
+    session.step = "kelolaEngagement_menu";
+    return oprRequestHandlers.kelolaEngagement_menu(session, chatId, "", waClient, pool, userModel);
   },
 
   kelolaAmplifikasi_menu: async (session, chatId, text, waClient, pool, userModel) => {
@@ -673,7 +1159,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await waClient.sendMessage(
         chatId,
         appendSubmenuBackInstruction(
-          `*Menu Tugas Amplifikasi*\n1️⃣ Update tugas rutin\n2️⃣ Input tugas khusus\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+          `📣 MENU TUGAS AMPLIFIKASI\n1️⃣ Update tugas rutin\n2️⃣ Input tugas khusus\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
         )
       );
       return;
@@ -683,14 +1169,14 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await waClient.sendMessage(
         chatId,
         appendSubmenuBackInstruction(
-          `*Menu Laporan Amplifikasi*\n1️⃣ Laporan tugas rutin\n2️⃣ Laporan tugas khusus\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+          `Menu Laporan Amplifikasi\n1️⃣ Laporan tugas rutin\n2️⃣ Laporan tugas khusus\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
         )
       );
       return;
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-2, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-2, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
@@ -737,12 +1223,12 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     if (/^2$/i.test(text.trim())) {
       clean();
       session.step = "tugasKhusus_link";
-      await waClient.sendMessage(chatId, "Kirim link Instagram tugas khusus:");
+      await waClient.sendMessage(chatId, "Kirim satu atau beberapa link Instagram tugas khusus (pisahkan dengan spasi atau baris baru):");
       return;
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-2, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-2, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
@@ -769,7 +1255,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await waClient.sendMessage(
         chatId,
         appendSubmenuBackInstruction(
-          `*Laporan Tugas Rutin*\n1️⃣ Rekap link harian\n2️⃣ Rekap link harian kemarin\n3️⃣ Rekap link per post\n4️⃣ Absensi amplifikasi user\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+          `Laporan Tugas Rutin\n1️⃣ Rekap link harian\n2️⃣ Rekap link harian kemarin\n3️⃣ Rekap link per post\n4️⃣ Absensi amplifikasi user\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
         )
       );
       return;
@@ -779,14 +1265,14 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await waClient.sendMessage(
         chatId,
         appendSubmenuBackInstruction(
-          `*Laporan Tugas Khusus*\n1️⃣ Rekap link tugas khusus\n2️⃣ Rekap per post khusus\n3️⃣ Absensi amplifikasi khusus\n\nKetik *angka menu* di atas, *menu* untuk kembali, atau *batal* untuk keluar.`
+          `Laporan Tugas Khusus\n1️⃣ Rekap link tugas khusus\n2️⃣ Rekap per post khusus\n3️⃣ Absensi amplifikasi khusus\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
         )
       );
       return;
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-2, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-2, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
@@ -879,7 +1365,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-4, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-4, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
@@ -976,7 +1462,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     await waClient.sendMessage(
       chatId,
-      "Menu tidak dikenal. Balas angka 1-3, *menu* untuk kembali, atau ketik *batal* untuk keluar."
+      "Menu tidak dikenal. 🔎 Balas angka 1-3, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
   },
 
@@ -989,20 +1475,20 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     const nrp = text.trim().replace(/[^0-9a-zA-Z]/g, "");
     if (!nrp) {
-      await waClient.sendMessage(chatId, "❌ NRP yang Anda masukkan tidak valid. Silakan masukkan ulang atau ketik *batal*.");
+      await waClient.sendMessage(chatId, "❌ NRP yang Anda masukkan tidak valid. Silakan masukkan ulang atau ketik batal.");
       return;
     }
     const existing = await userModel.findUserById(nrp);
     if (existing) {
-      let msg = `⚠️ NRP/NIP *${nrp}* sudah terdaftar:\n`;
-      msg += `  • Nama: *${existing.nama || "-"}*\n  • Pangkat: *${existing.title || "-"}*\n  • Satfung: *${existing.divisi || "-"}*\n  • Jabatan: *${existing.jabatan || "-"}*\n  • Status: ${existing.status ? "🟢 AKTIF" : "🔴 NONAKTIF"}\n`;
+      let msg = `⚠️ NRP/NIP ${nrp} sudah terdaftar:\n`;
+      msg += `  • Nama: ${existing.nama || "-"}\n  • Pangkat: ${existing.title || "-"}\n  • Satfung: ${existing.divisi || "-"}\n  • Jabatan: ${existing.jabatan || "-"}\n  • Status: ${existing.status ? "🟢 AKTIF" : "🔴 NONAKTIF"}\n`;
       await waClient.sendMessage(chatId, msg + "\nTidak bisa menambahkan user baru dengan NRP/NIP ini.");
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
     session.addUser = { user_id: nrp, operator: true };
     session.step = "addUser_nama";
-    await waClient.sendMessage(chatId, "Masukkan *Nama Lengkap* (huruf kapital):");
+    await waClient.sendMessage(chatId, "Masukkan Nama Lengkap (huruf kapital):");
   },
 
   addUser_nama: async (session, chatId, text, waClient, pool, userModel) => {
@@ -1018,7 +1504,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     session.addUser.nama = nama;
     session.step = "addUser_pangkat";
-    await waClient.sendMessage(chatId, "Masukkan *Pangkat* (huruf kapital, misal: BRIPKA):");
+    await waClient.sendMessage(chatId, "Masukkan Pangkat (huruf kapital, misal: BRIPKA):");
   },
 
   addUser_pangkat: async (session, chatId, text, waClient, pool, userModel) => {
@@ -1047,7 +1533,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await userModel.getAvailableSatfung(clientId)
     );
     const sorted = sortDivisionKeys(satfung);
-    let msg = "*Pilih Satfung* (ketik nomor atau nama sesuai daftar):\n";
+    let msg = "👮 PILIH SATFUNG (ketik nomor atau nama sesuai daftar):\n";
     msg += sorted.map((s, i) => ` ${i + 1}. ${s}`).join("\n");
     session.availableSatfung = sorted;
     await waClient.sendMessage(chatId, appendSubmenuBackInstruction(msg));
@@ -1082,7 +1568,7 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
     }
     session.addUser.divisi = satfung;
     session.step = "addUser_jabatan";
-    await waClient.sendMessage(chatId, "Masukkan *Jabatan* (huruf kapital, contoh: BAURMIN):");
+    await waClient.sendMessage(chatId, "Masukkan Jabatan (huruf kapital, contoh: BAURMIN):");
   },
 
   addUser_jabatan: async (session, chatId, text, waClient, pool, userModel) => {
@@ -1105,12 +1591,12 @@ Ketik *angka menu* di atas, atau *batal* untuk keluar.
       await userModel.createUser(session.addUser);
       await waClient.sendMessage(
         chatId,
-        `✅ *User baru berhasil ditambahkan:*\n━━━━━━━━━━━━━━━━━━━━━━
-*NRP*: ${session.addUser.user_id}
-*Nama*: ${session.addUser.nama}
-*Pangkat*: ${session.addUser.title}
-*Satfung*: ${session.addUser.divisi}
-*Jabatan*: ${session.addUser.jabatan}
+        `✅ User baru berhasil ditambahkan:\n━━━━━━━━━━━━━━━━━━━━━━
+NRP: ${session.addUser.user_id}
+Nama: ${session.addUser.nama}
+Pangkat: ${session.addUser.title}
+Satfung: ${session.addUser.divisi}
+Jabatan: ${session.addUser.jabatan}
 Status: 🟢 AKTIF, Exception: False
 ━━━━━━━━━━━━━━━━━━━━━━`
       );
@@ -1134,7 +1620,7 @@ Status: 🟢 AKTIF, Exception: False
       ? await userModel.findUserByIdAndClient(nrp, clientId)
       : await userModel.findUserById(nrp);
     if (!user) {
-      await waClient.sendMessage(chatId, `❌ User dengan NRP/NIP *${nrp}* tidak ditemukan. Hubungi Opr Humas Polres Anda.`);
+      await waClient.sendMessage(chatId, `❌ User dengan NRP/NIP ${nrp} tidak ditemukan. Hubungi Opr Humas Polres Anda.`);
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
@@ -1142,31 +1628,31 @@ Status: 🟢 AKTIF, Exception: False
     if (!hasOperatorRole(roles)) {
       await waClient.sendMessage(
         chatId,
-        `❌ User dengan NRP/NIP *${nrp}* tidak memiliki role operator.`
+        `❌ User dengan NRP/NIP ${nrp} tidak memiliki role operator.`
       );
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
-    let statusStr = user.status ? "🟢 *AKTIF*" : "🔴 *NONAKTIF*";
+    let statusStr = user.status ? "🟢 AKTIF" : "🔴 NONAKTIF";
     const roleStr = roles.length ? roles.join(", ") : "-";
     let msg = `
 ━━━━━━━━━━━━━━━━━━━━━━
-👤 *Data User* ━━━━━━━━━━
+👤 Data User ━━━━━━━━━━
 
-*NRP/NIP*   : ${user.user_id}
-*Nama*      : ${user.nama || "-"}
-*Pangkat*   : ${user.title || "-"}
-*Satfung*   : ${user.divisi || "-"}
-*Jabatan*   : ${user.jabatan || "-"}
-*Status*    : ${statusStr}
-*Role Aktif*: ${roleStr}
+NRP/NIP   : ${user.user_id}
+Nama      : ${user.nama || "-"}
+Pangkat   : ${user.title || "-"}
+Satfung   : ${user.divisi || "-"}
+Jabatan   : ${user.jabatan || "-"}
+Status    : ${statusStr}
+Role Aktif: ${roleStr}
 ━━━━━━━━━━━━━━━━━━━━━━
 
 Status baru yang akan di-set:
-1. 🟢 *AKTIF*
-2. 🔴 *NONAKTIF*
+1. 🟢 AKTIF
+2. 🔴 NONAKTIF
 
-Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
+Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
 `.trim();
 
     session.updateStatusNRP = nrp;
@@ -1226,10 +1712,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       list.tiktok.length +
       list.youtube.length;
 
-    const now = new Date();
-    const hari = hariIndo[now.getDay()];
-    const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
-    const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
+    const { hari, tanggal, jam } = buildJakartaDateContext();
     const salam = getGreeting();
 
     const { rows: nameRows } = await pool.query(
@@ -1320,11 +1803,9 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       list.youtube.length;
 
     const now = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-    const hari = hariIndo[yesterday.getDay()];
-    const tanggal = yesterday.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
-    const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const { hari, tanggal } = buildJakartaDateContext(yesterday);
+    const { jam } = buildJakartaDateContext(now);
     const salam = getGreeting();
 
     const { rows: nameRows } = await pool.query(
@@ -1399,10 +1880,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
     const totalLinks =
       list.facebook.length + list.instagram.length + list.twitter.length + list.tiktok.length + list.youtube.length;
 
-    const now = new Date();
-    const hari = hariIndo[now.getDay()];
-    const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
-    const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
+    const { hari, tanggal, jam } = buildJakartaDateContext();
     const salam = getGreeting();
     const { rows: nameRows } = await pool.query(
       "SELECT nama FROM clients WHERE client_id=$1 LIMIT 1",
@@ -1519,10 +1997,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       list.tiktok.length +
       list.youtube.length;
 
-    const now = new Date();
-    const hari = hariIndo[now.getDay()];
-    const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
-    const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
+    const { hari, tanggal, jam } = buildJakartaDateContext();
     const salam = getGreeting();
 
     const { rows: nameRows } = await pool.query(
@@ -1634,10 +2109,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       list.tiktok.length +
       list.youtube.length;
 
-    const now = new Date();
-    const hari = hariIndo[now.getDay()];
-    const tanggal = now.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta" });
-    const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
+    const { hari, tanggal, jam } = buildJakartaDateContext();
     const salam = getGreeting();
 
     const { rows: nameRows } = await pool.query(
@@ -1722,7 +2194,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
           await waClient.sendMessage(
             chatId,
             appendSubmenuBackInstruction(
-              `User memiliki lebih dari satu role. Pilih role yang akan dihapus:\n${choices}\n\nBalas angka atau ketik *batal* untuk keluar.`
+              `User memiliki lebih dari satu role. Pilih role yang akan dihapus:\n${choices}\n\nBalas angka atau ketik 🚫 batal untuk keluar.`
             )
           );
           return;
@@ -2378,8 +2850,9 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       if (pilihan === 1) mode = "all";
       else if (pilihan === 2) mode = "sudah";
       else if (pilihan === 3) mode = "belum";
+    else if (pilihan === 4) mode = "kurang_belum";
       else {
-        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-3.");
+        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-4.");
         return;
       }
       const msg = await absensiLink(clientId, { mode, roleFlag: OPERATOR_ROLE });
@@ -2427,8 +2900,9 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       if (pilihan === 1) mode = "all";
       else if (pilihan === 2) mode = "sudah";
       else if (pilihan === 3) mode = "belum";
+    else if (pilihan === 4) mode = "kurang_belum";
       else {
-        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-3.");
+        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-4.");
         return;
       }
       const msg = await absensiLinkKhusus(clientId, { mode, roleFlag: OPERATOR_ROLE });
@@ -2580,7 +3054,7 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
     await waClient.sendMessage(
       chatId,
       appendSubmenuBackInstruction(
-        "Pilih tipe absensi engagement:\n1. Semua\n2. Sudah\n3. Belum\nBalas angka di atas."
+        "📌 PILIH JENIS ABSENSI\n\n1️⃣  ✅ Semua\n2️⃣  🟢 Sudah melaksanakan\n3️⃣  ⏳ Belum melaksanakan\n4️⃣  ⚠️ Kurang + Belum\n\n📌 Balas nomor laporan yang diperlukan."
       )
     );
     session.step = "absensiEngagement_menu";
@@ -2617,8 +3091,9 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
     if (pilihan === 1) mode = "all";
     else if (pilihan === 2) mode = "sudah";
     else if (pilihan === 3) mode = "belum";
+    else if (pilihan === 4) mode = "kurang_belum";
     else {
-      await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-3.");
+      await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-4.");
       return;
     }
     let msg;
@@ -2679,8 +3154,9 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
       if (pilihan === 1) mode = "all";
       else if (pilihan === 2) mode = "sudah";
       else if (pilihan === 3) mode = "belum";
+    else if (pilihan === 4) mode = "kurang_belum";
       else {
-        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-3.");
+        await waClient.sendMessage(chatId, "Pilihan tidak valid. Balas 1-4.");
         return;
       }
       const msg = await absensiRegistrasiWa(clientId, { mode, roleFlag: OPERATOR_ROLE });
@@ -2693,28 +3169,66 @@ Balas *angka* (1/2) sesuai status baru, atau *batal* untuk keluar.
   },
 
   tugasKhusus_link: async (session, chatId, text, waClient, pool, userModel) => {
-    if (/^(batal|cancel|exit)$/i.test(text.trim())) {
+    const input = (text || "").trim();
+    if (/^(batal|cancel|exit)$/i.test(input)) {
       session.step = "main";
       await waClient.sendMessage(chatId, "❎ Batal tugas khusus.");
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
+
     const clientId = await resolveClientId(session, chatId, pool);
     if (!clientId) {
       await waClient.sendMessage(chatId, "❌ Client tidak ditemukan untuk nomor ini.");
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
+
     try {
       const { fetchSinglePostKhusus } = await import("../fetchpost/instaFetchPost.js");
-      const post = await fetchSinglePostKhusus(text.trim(), clientId);
-      const link = `https://www.instagram.com/p/${post.shortcode}`;
-      await waClient.sendMessage(
-        chatId,
-        `✅ Fetch post tugas khusus selesai:\n${link}`
-      );
-    } catch (e) {
-      await waClient.sendMessage(chatId, `❌ Gagal fetch: ${e.message}`);
+      const links = extractInstagramLinksFromInput(input);
+      if (!links.length) {
+        await waClient.sendMessage(
+          chatId,
+          "❌ Tidak ada link Instagram valid. Kirim satu atau beberapa URL Instagram (pisahkan dengan spasi atau baris baru)."
+        );
+        return;
+      }
+
+      const successLinks = [];
+      const failedLinks = [];
+      for (const linkInput of links) {
+        try {
+          const post = await fetchSinglePostKhusus(linkInput, clientId);
+          successLinks.push("https://www.instagram.com/p/" + post.shortcode + "/");
+        } catch (error) {
+          failedLinks.push("- " + linkInput + " => " + error.message);
+        }
+      }
+
+      if (successLinks.length) {
+        await waClient.sendMessage(
+          chatId,
+          "✅ Fetch post tugas khusus selesai: *" + successLinks.length + "* berhasil.\n" +
+            successLinks.join("\n") +
+            "\nSumber data: *manual input*."
+        );
+      }
+
+      if (failedLinks.length) {
+        await waClient.sendMessage(
+          chatId,
+          "⚠️ Sebagian link gagal diproses (*" + failedLinks.length + "*):\n" +
+            failedLinks.join("\n")
+        );
+      }
+
+      if (!successLinks.length && failedLinks.length) {
+        await waClient.sendMessage(chatId, "❌ Tidak ada link yang berhasil diproses.");
+      }
+    } catch (error) {
+      await waClient.sendMessage(chatId, "❌ Gagal fetch: " + error.message);
     }
+
     session.step = "main";
     return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
   },

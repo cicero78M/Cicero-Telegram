@@ -21,6 +21,16 @@ import { sortUsersByPositionRankAndName } from "../../../utils/sortingHelper.js"
 // Use the comprehensive sorting function from sortingHelper
 const sortUsersByRankAndName = sortUsersByPositionRankAndName;
 
+export function getEffectiveInstagramUsername(user) {
+  const active = user?.effective_insta;
+  if (typeof active === 'string' && active.trim() !== '') return active;
+  return user?.insta || '';
+}
+
+export function getInstagramUsernameAliases(user) {
+  return [...new Set([user?.effective_insta, user?.insta].filter((value) => typeof value === 'string' && value.trim() !== '').map(normalizeUsername))];
+}
+
 export async function collectLikesRecap(clientId, opts = {}) {
   const roleName = String(clientId || "").toLowerCase();
   let shortcodes;
@@ -64,8 +74,8 @@ export async function collectLikesRecap(clientId, opts = {}) {
           satfung: div,
         };
         shortcodes.forEach((sc, idx) => {
-          const uname = normalizeUsername(u.insta);
-          row[sc] = uname && likesSets[idx].has(uname) ? 1 : 0;
+          const aliases = getInstagramUsernameAliases(u);
+          row[sc] = aliases.some((uname) => likesSets[idx].has(uname)) ? 1 : 0;
         });
         rows.push(row);
       });
@@ -140,14 +150,14 @@ export async function absensiLikes(client_id, opts = {}) {
       const belum = [];
       const tanpaUsername = [];
       users.forEach((u) => {
-        if (!u.insta || u.insta.trim() === "") {
+        if (getInstagramUsernameAliases(u).length === 0) {
           tanpaUsername.push(u);
           return;
         }
-        const uname = normalizeUsername(u.insta);
+        const aliases = getInstagramUsernameAliases(u);
         let count = 0;
         likesSets.forEach((set) => {
-          if (set.has(uname)) count += 1;
+          if (aliases.some((uname) => set.has(uname))) count += 1;
         });
         const percentage = totalKonten ? (count / totalKonten) * 100 : 0;
         if (percentage >= 50) sudah.push(u);
@@ -234,9 +244,7 @@ export async function absensiLikes(client_id, opts = {}) {
   likesSets.forEach((likesSet) => {
     users.forEach((u) => {
       if (
-        u.insta &&
-        u.insta.trim() !== "" &&
-        likesSet.has(normalizeUsername(u.insta))
+        getInstagramUsernameAliases(u).some((uname) => likesSet.has(uname))
       ) {
         userStats[u.user_id].count += 1;
       }
@@ -249,7 +257,7 @@ export async function absensiLikes(client_id, opts = {}) {
     {
       totalTarget: totalKonten,
       getCount: (u) => u.count || 0,
-      hasUsername: (u) => !!(u.insta && u.insta.trim() !== ""),
+      hasUsername: (u) => getInstagramUsernameAliases(u).length > 0,
     }
   );
 
@@ -271,7 +279,12 @@ export async function absensiLikes(client_id, opts = {}) {
     `⚠️ *Melaksanakan kurang lengkap* : *${summary.kurang} user*\n` +
     `❌ *Belum melaksanakan* : *${summary.belum} user*\n\n`;
 
-  const divisionKeys = sortDivisionKeys(Object.keys(statusByDivision));
+  const divisionKeys = sortDivisionKeys(
+    Object.keys(statusByDivision).filter((div) => {
+      if (mode !== "belum" && mode !== "kurang_belum") return true;
+      return mode === "kurang_belum" ? statusByDivision[div].kurang.length > 0 || statusByDivision[div].belum.length > 0 : statusByDivision[div].belum.length > 0;
+    }),
+  );
   const formatUserLine = (u) => {
     const handle = u.insta ? `@${u.insta.replace(/^@/, "")}` : "-";
     const progress = `(${u.count || 0}/${totalKonten} konten)`;
@@ -281,10 +294,10 @@ export async function absensiLikes(client_id, opts = {}) {
   if (mode === "all" || mode === "sudah") {
     msg += `✅ *Melaksanakan lengkap* (${summary.lengkap} user)\n`;
   }
-  if (mode === "all" || mode === "sudah") {
+  if (mode === "all" || mode === "sudah" || mode === "kurang_belum") {
     msg += `⚠️ *Melaksanakan kurang lengkap* (${summary.kurang} user)\n`;
   }
-  if (mode === "all" || mode === "belum") {
+  if (mode === "all" || mode === "belum" || mode === "kurang_belum") {
     msg += `❌ *Belum melaksanakan* (${summary.belum} user)\n`;
   }
   msg += "\n";
@@ -311,7 +324,15 @@ export async function absensiLikes(client_id, opts = {}) {
           : "-\n";
       }
 
-      if (mode === "all" || mode === "belum") {
+      if (mode === "kurang_belum") {
+        const kurangUsers = sortUsersByRankAndName(data.kurang);
+        msg += `⚠️ Kurang (${data.kurang.length} user):\n`;
+        msg += data.kurang.length
+          ? kurangUsers.map(formatUserLine).join("\n") + "\n"
+          : "-\n";
+      }
+
+      if (mode === "all" || mode === "belum" || mode === "kurang_belum") {
         const belumUsers = sortUsersByRankAndName(data.belum);
         msg += `❌ Belum (${data.belum.length} user):\n`;
         msg += data.belum.length
@@ -369,9 +390,7 @@ export async function absensiLikesPerKonten(client_id, opts = {}) {
     let userBelum = [];
     users.forEach((u) => {
       if (
-        u.insta &&
-        u.insta.trim() !== "" &&
-        likesSet.has(normalizeUsername(u.insta))
+        getInstagramUsernameAliases(u).some((uname) => likesSet.has(uname))
       ) {
         userSudah.push(u);
       } else {

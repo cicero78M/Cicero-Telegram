@@ -129,3 +129,25 @@ export function escapeMarkdown(text) {
     .replace(/`/g, '\\`')
     .replace(/\[/g, '\\[');
 }
+
+/**
+ * Configure Telegram's native command menu for private chats.
+ * The commands appear from the menu button beside the message composer.
+ */
+export async function configureTelegramMenu(bot, commands, botName) {
+  try {
+    if (typeof bot.setMyCommands === 'function') {
+      await bot.setMyCommands(commands, {
+        scope: { type: 'all_private_chats' },
+        language_code: 'id'
+      });
+    }
+    if (typeof bot.setChatMenuButton === 'function') {
+      await bot.setChatMenuButton({ menu_button: { type: 'commands' } });
+    }
+    console.log(`[Telegram ${botName}] Native command menu configured`);
+  } catch (error) {
+    // Menu configuration must not prevent the bot from starting.
+    console.warn(`[Telegram ${botName}] Could not configure native command menu: ${error.message}`);
+  }
+}

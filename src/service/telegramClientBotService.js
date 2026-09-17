@@ -18,7 +18,7 @@ import {
   toggleClientStatus,
   findClientById
 } from './clientService.js';
-import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import { configureTelegramMenu, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 import { formatNama } from '../utils/utilsHelper.js';
 
 let clientBot = null;
@@ -75,6 +75,11 @@ export async function initializeTelegramClientBot(token, enabled = true) {
   try {
     console.log('[Telegram Client Bot] Initializing bot...');
     clientBot = new TelegramBot(token, { polling: true });
+    await configureTelegramMenu(clientBot, [
+      { command: 'start', description: 'Buka beranda client' },
+      { command: 'menu', description: 'Buka menu client' },
+      { command: 'help', description: 'Bantuan client' }
+    ], 'Client Bot');
     
     // Set up command handlers
     setupCommandHandlers();

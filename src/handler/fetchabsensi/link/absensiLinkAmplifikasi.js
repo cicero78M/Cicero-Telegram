@@ -52,7 +52,13 @@ export async function absensiLink(client_id, opts = {}) {
   if (!shortcodes.length)
     return `Tidak ada konten IG untuk *${clientNama}* hari ini.`;
 
-  const reports = await getReportsTodayByClient(client_id);
+  let reports = await getReportsTodayByClient(client_id);
+  if (!reports.length) {
+    const { getReportsTodayByClient: getSpecialReportsTodayByClient } = await import("../../../model/linkReportKhususModel.js");
+    const specialReports = await getSpecialReportsTodayByClient(client_id, roleFlag);
+    const shortcodeSet = new Set(shortcodes);
+    reports = specialReports.filter((report) => shortcodeSet.has(report.shortcode));
+  }
   const userStats = {};
   users.forEach((u) => {
     userStats[u.user_id] = { ...u, tasksDone: 0, linkCount: 0 };

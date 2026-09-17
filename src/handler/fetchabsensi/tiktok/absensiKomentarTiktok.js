@@ -63,6 +63,20 @@ export function normalizeUsername(username) {
     .toLowerCase();
 }
 
+export function getEffectiveTikTokUsername(user) {
+  const active = user?.effective_tiktok;
+  if (typeof active === "string" && active.trim() !== "") return active;
+  return user?.tiktok || "";
+}
+
+export function getTikTokUsernameAliases(user) {
+  return [...new Set(
+    [user?.effective_tiktok, user?.tiktok_legacy, user?.tiktok]
+      .filter((value) => typeof value === "string" && value.trim() !== "")
+      .map(normalizeUsername),
+  )];
+}
+
 // Use the comprehensive sorting function from sortingHelper
 const sortUsersByRankAndName = sortUsersByPositionRankAndName;
 
@@ -134,8 +148,8 @@ export async function collectKomentarRecap(clientId, opts = {}) {
           satfung: div,
         };
         videoIds.forEach((vid, idx) => {
-          const uname = normalizeUsername(u.tiktok);
-          row[vid] = uname && commentSets[idx].has(uname) ? 1 : 0;
+          const usernames = getTikTokUsernameAliases(u);
+          row[vid] = usernames.some((uname) => commentSets[idx].has(uname)) ? 1 : 0;
         });
         rows.push(row);
       });
@@ -225,11 +239,7 @@ export async function absensiKomentar(client_id, opts = {}) {
 
   commentSets.forEach((commentSet) => {
     users.forEach((u) => {
-      if (
-        u.tiktok &&
-        u.tiktok.trim() !== "" &&
-        commentSet.has(u.tiktok.replace(/^@/, "").toLowerCase())
-      ) {
+      if (getTikTokUsernameAliases(u).some((username) => commentSet.has(username))) {
         userStats[u.user_id].count += 1;
       }
     });
@@ -243,7 +253,7 @@ export async function absensiKomentar(client_id, opts = {}) {
       {
         totalTarget: totalKonten,
         getCount: (u) => u.count || 0,
-        hasUsername: (u) => !!(u.tiktok && u.tiktok.trim() !== ""),
+        hasUsername: (u) => getTikTokUsernameAliases(u).length > 0,
       }
     );
 
@@ -251,11 +261,16 @@ export async function absensiKomentar(client_id, opts = {}) {
       (p) => `https://www.tiktok.com/@${tiktokUsername}/video/${p.video_id}`
     );
     const mode = (opts && opts.mode) ? String(opts.mode).toLowerCase() : "all";
-    const divisionKeys = sortDivisionKeys(Object.keys(statusByDivision));
+    const divisionKeys = sortDivisionKeys(
+      Object.keys(statusByDivision).filter((div) => {
+        if (mode !== "belum" && mode !== "kurang_belum") return true;
+        return mode === "kurang_belum" ? (statusByDivision[div].kurang.length > 0 || statusByDivision[div].belum.length > 0) : statusByDivision[div].belum.length > 0;
+      }),
+    );
     const formatUserLine = (u) => {
-      const handle = u.tiktok ? u.tiktok : "belum mengisi data tiktok";
+      const handle = getEffectiveTikTokUsername(u) || getTikTokUsernameAliases(u)[0] || "-";
       const progress = `(${u.count || 0}/${totalKonten} konten)`;
-      return `- ${u.title ? u.title + " " : ""}${u.nama} : ${handle} ${progress}`.trim();
+      return `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ${handle} ${progress}`.trim();
     };
 
     let msg =
@@ -271,9 +286,11 @@ export async function absensiKomentar(client_id, opts = {}) {
 
     if (mode === "all" || mode === "sudah") {
       msg += `✅ *Melaksanakan lengkap* (${summary.lengkap} user)\n`;
-      msg += `⚠️ *Melaksanakan kurang lengkap* (${summary.kurang} user)\n`;
     }
-    if (mode === "all" || mode === "belum") {
+    if (mode === "all" || mode === "kurang_belum") {
+        msg += `⚠️ *Melaksanakan kurang lengkap* (${summary.kurang} user)\n`;
+      }
+    if (mode === "all" || mode === "belum" || mode === "kurang_belum") {
       msg += `❌ *Belum melaksanakan* (${summary.belum} user)\n`;
     }
     msg += "\n";
@@ -300,7 +317,15 @@ export async function absensiKomentar(client_id, opts = {}) {
             : "-\n";
         }
 
-        if (mode === "all" || mode === "belum") {
+        if (mode === "kurang_belum") {
+          const kurangUsers = sortUsersByRankAndName(data.kurang);
+          msg += `⚠️ Kurang (${data.kurang.length} user):\n`;
+          msg += data.kurang.length
+            ? kurangUsers.map(formatUserLine).join("\n") + "\n"
+            : "-\n";
+        }
+
+        if (mode === "all" || mode === "belum" || mode === "kurang_belum") {
           const belumUsers = sortUsersByRankAndName(data.belum);
           msg += `❌ Belum (${data.belum.length} user):\n`;
           msg += data.belum.length
@@ -334,7 +359,7 @@ export async function absensiKomentar(client_id, opts = {}) {
         };
       const g = groups[cid];
       g.total++;
-      if (!u.tiktok || u.tiktok.trim() === "") {
+      if (getTikTokUsernameAliases(u).length === 0) {
         g.noUsername++;
       } else if (u.count >= Math.ceil(totalKonten / 2)) {
         g.sudah++;
@@ -422,17 +447,15 @@ export async function absensiKomentar(client_id, opts = {}) {
     return msg.trim();
   }
 
-  let sudah = [], belum = [];
+  let sudah = [], kurang = [], belum = [];
 
   Object.values(userStats).forEach((u) => {
-    if (
-      u.tiktok &&
-      u.tiktok.trim() !== "" &&
-      u.count >= Math.ceil(totalKonten / 2)
-    ) {
+    if (!getTikTokUsernameAliases(u).length || u.count === 0) {
+      belum.push(u);
+    } else if (u.count === totalKonten) {
       sudah.push(u);
     } else {
-      belum.push(u);
+      kurang.push(u);
     }
   });
 
@@ -457,9 +480,9 @@ export async function absensiKomentar(client_id, opts = {}) {
     });
 
   const usersWithUsername = users.filter(
-    (u) => u.tiktok && u.tiktok.trim() !== ""
+    (u) => getTikTokUsernameAliases(u).length > 0
   );
-  const targetPerUser = Math.ceil(totalKonten / 2) || 0;
+  const targetPerUser = totalKonten || 0;
   const totalEligible = usersWithUsername.length;
   const totalInteractions = Object.values(userStats).reduce(
     (acc, u) => acc + (u.count || 0),
@@ -544,12 +567,10 @@ export async function absensiKomentar(client_id, opts = {}) {
       lines.push(
         list
           .map((u) => {
-            const ket = u.count
-              ? `(${u.count}/${totalKonten} konten)`
-              : "";
+            const ket = `(${Number(u.count || 0)}/${totalKonten} konten)`;
             return (
-              `- ${u.title ? u.title + " " : ""}${u.nama} : ` +
-              `${u.tiktok ? u.tiktok : "belum mengisi data tiktok"} ${ket}`
+              `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ` +
+              `${getEffectiveTikTokUsername(u) || getTikTokUsernameAliases(u)[0] || "-"} ${ket}`
             ).trim();
           })
           .join("\n")
@@ -562,7 +583,20 @@ export async function absensiKomentar(client_id, opts = {}) {
     );
   }
 
-  if (mode === "all" || mode === "belum") {
+  if (mode === "kurang_belum") {
+    const kurangDiv = groupByDivision(kurang);
+    const lines = [];
+    sortDivisionKeys(Object.keys(kurangDiv)).forEach((div, idx, arr) => {
+      const list = sortUsersByRankAndName(kurangDiv[div]);
+      lines.push(`*${div}* (${list.length} user):`);
+      lines.push(list.length ? list.map((u) => `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ${getEffectiveTikTokUsername(u) || getTikTokUsernameAliases(u)[0] || "-"} (${u.count}/${totalKonten} konten)`).join("\n") : "-");
+      if (idx < arr.length - 1) lines.push("");
+    });
+    if (!Object.keys(kurangDiv).length) lines.push("-");
+    lampiranSections.push(`⚠️ *Lampiran – Personel kurang lengkap* (${kurang.length} user)\n${lines.join("\n")}`);
+  }
+
+  if (mode === "all" || mode === "belum" || mode === "kurang_belum") {
     const belumDiv = groupByDivision(belum);
     const lines = [];
     sortDivisionKeys(Object.keys(belumDiv)).forEach((div, idx, arr) => {
@@ -578,8 +612,8 @@ export async function absensiKomentar(client_id, opts = {}) {
               ket = `(${u.count}/${totalKonten} konten)`;
             }
             return (
-              `- ${u.title ? u.title + " " : ""}${u.nama} : ` +
-              `${u.tiktok ? u.tiktok : "belum mengisi data tiktok"} ${ket}`
+              `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ` +
+              `${getEffectiveTikTokUsername(u) || getTikTokUsernameAliases(u)[0] || "-"} ${ket}`
             ).trim();
           })
           .join("\n")
@@ -666,14 +700,14 @@ export async function absensiKomentarDitbinmasSimple(clientId = "DITBINMAS") {
   };
 
   allUsers.forEach((u) => {
-    if (!u.tiktok || u.tiktok.trim() === "") {
+    if (getTikTokUsernameAliases(u).length === 0) {
       categorizedUsers.tanpaUsername.push(u);
       return;
     }
-    const uname = normalizeUsername(u.tiktok);
+    const usernames = getTikTokUsernameAliases(u);
     let count = 0;
     commentSets.forEach((set) => {
-      if (set.has(uname)) count += 1;
+      if (usernames.some((username) => set.has(username))) count += 1;
     });
     if (count === posts.length) {
       categorizedUsers.lengkap.push(u);
@@ -825,19 +859,19 @@ export async function absensiKomentarDitbinmasReport(clientId = "DITBINMAS") {
 
     users.forEach((u) => {
       const baseData = { user: u, commentCount: 0 };
-      if (!u.tiktok || u.tiktok.trim() === "") {
+      if (getTikTokUsernameAliases(u).length === 0) {
         tanpaUsername.push(baseData);
         return;
       }
-      const uname = normalizeUsername(u.tiktok);
+      const usernames = getTikTokUsernameAliases(u);
       let count = 0;
       commentSets.forEach((set) => {
-        if (set.has(uname)) count += 1;
+        if (usernames.some((username) => set.has(username))) count += 1;
       });
       totalPelaksanaanDivisi += count;
       const payload = { user: u, commentCount: count };
       const percentage = totalKonten ? (count / totalKonten) * 100 : 0;
-      if (percentage >= 50) sudah.push(payload);
+      if (count === totalKonten) sudah.push(payload);
       else if (percentage > 0) kurang.push(payload);
       else belum.push(payload);
     });
@@ -1067,14 +1101,14 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
       if (!u.insta || u.insta.trim() === "") {
         noUname.push(u);
       }
-      if (!u.tiktok || u.tiktok.trim() === "") {
+      if (getTikTokUsernameAliases(u).length === 0) {
         noTiktok++;
         return;
       }
-      const uname = normalizeUsername(u.tiktok);
+      const usernames = getTikTokUsernameAliases(u);
       let count = 0;
       commentSets.forEach((set) => {
-        if (set.has(uname)) count += 1;
+        if (usernames.some((username) => set.has(username))) count += 1;
       });
       if (count === posts.length) already.push({ ...u, count });
       else if (count > 0) partial.push({ ...u, count });
@@ -1124,7 +1158,7 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
     blockLines.push(`Belum Komentar : ${none.length}`);
     if (none.length) {
       blockLines.push("");
-      blockLines.push(...none.map((u) => `- ${formatNama(u)}, ${u.tiktok || "-"}`));
+      blockLines.push(...none.map((u) => `- ${formatNama(u)}, ${getEffectiveTikTokUsername(u) || "-"}`));
     }
 
     blockLines.push("");
@@ -1135,7 +1169,7 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
         ...noUname.map(
           (u) =>
             `- ${formatNama(u)}, IG ${u.insta ? u.insta : "Kosong"}, Tiktok ${
-              u.tiktok ? u.tiktok : "Kosong"
+              getEffectiveTikTokUsername(u) || "Kosong"
             }`
         )
       );
@@ -1170,7 +1204,7 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
       if (none.length) {
         belumLines.push(`Belum Komentar : ${none.length}`);
         belumLines.push(
-          ...none.map((u) => `- ${formatNama(u)}, ${u.tiktok || "-"}`)
+          ...none.map((u) => `- ${formatNama(u)}, ${getEffectiveTikTokUsername(u) || "-"}`)
         );
       }
       if (noUname.length) {
@@ -1180,7 +1214,7 @@ export async function lapharTiktokDitbinmas(clientId = "DITBINMAS") {
           ...noUname.map(
             (u) =>
               `- ${formatNama(u)}, IG ${u.insta ? u.insta : "Kosong"}, Tiktok ${
-                u.tiktok ? u.tiktok : "Kosong"
+                getEffectiveTikTokUsername(u) || "Kosong"
               }`
           )
         );
@@ -1356,9 +1390,7 @@ export async function absensiKomentarTiktokPerKonten(client_id, opts = {}) {
       if (u.exception === true) {
         userSudah.push(u);
       } else if (
-        u.tiktok &&
-        u.tiktok.trim() !== "" &&
-        commentSet.has(u.tiktok.replace(/^@/, "").toLowerCase())
+        getTikTokUsernameAliases(u).some((username) => commentSet.has(username))
       ) {
         userSudah.push(u);
       } else {
@@ -1384,7 +1416,7 @@ export async function absensiKomentarTiktokPerKonten(client_id, opts = {}) {
         msg += `*${div}* (${list.length} user):\n`;
         msg += list.length
           ? list.map(u =>
-              `- ${u.title ? u.title + " " : ""}${u.nama} : ${u.tiktok || "-"}`
+              `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ${getEffectiveTikTokUsername(u) || "-"}`
             ).join("\n") + "\n"
           : "-\n";
         if (idx < arr.length - 1) msg += "\n";
@@ -1401,7 +1433,7 @@ export async function absensiKomentarTiktokPerKonten(client_id, opts = {}) {
         msg += list.length
           ? `*${div}* (${list.length} user):\n` +
             list.map(u =>
-              `- ${u.title ? u.title + " " : ""}${u.nama} : ${u.tiktok || "-"}`
+              `- ${u.title ? u.title + " " : ""}${formatNama(u) || u.nama || u.user_id || "-"} : ${getEffectiveTikTokUsername(u) || "-"}`
             ).join("\n") + "\n"
           : "-\n";
         if (idx < arr.length - 1) msg += "\n";
