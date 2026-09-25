@@ -9,6 +9,7 @@ import {
 } from "../../utils/utilsHelper.js";
 import { appendSubmenuBackInstruction } from "./menuPromptHelpers.js";
 import * as clientModel from "../../model/clientModel.js";
+import { applyTelegramStatusChange, isTelegramStatusHistoryEnabled } from "../../service/telegramStatusChangeService.js";
 
 function ignore(..._args) {}
 
@@ -1091,7 +1092,7 @@ ${menuItems.join('\n')}
             contentId: videoId,
             sourceLink,
           });
-          const deletedRows = await deletePostByVideoId(videoId, clientId);
+          const deletedRows = await deletePostByVideoId(videoId, clientId, { allowManual: true });
           tiktokDeletedCount += deletedRows;
         } catch (error) {
           tiktokFailures.push(`- ${sourceLink} => ${error.message}`);
@@ -2176,8 +2177,17 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     }
     try {
       if (status === true) {
-        await userModel.updateUserField(session.updateStatusNRP, "status", status);
-        const user = await userModel.findUserById(session.updateStatusNRP);
+        const actorUser = isTelegramStatusHistoryEnabled()
+          ? await userModel.findUserByTelegramChatId(chatId)
+          : null;
+        const user = isTelegramStatusHistoryEnabled()
+          ? await applyTelegramStatusChange({
+              userId: session.updateStatusNRP,
+              actionType: 'activate',
+              actorUser,
+              chatId,
+            })
+          : (await userModel.updateUserField(session.updateStatusNRP, "status", status), await userModel.findUserById(session.updateStatusNRP));
         let statusStr = "🟢 *AKTIF*";
         let msg = `✅ *Status user berhasil diubah!*
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -2200,7 +2210,18 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
           return;
         }
         const roleToRemove = session.updateStatusRoleChoice || roles[0] || null;
-        const updatedUser = await userModel.deactivateRoleOrUser(session.updateStatusNRP, roleToRemove);
+        const actorUser = isTelegramStatusHistoryEnabled()
+          ? await userModel.findUserByTelegramChatId(chatId)
+          : null;
+        const updatedUser = isTelegramStatusHistoryEnabled()
+          ? await applyTelegramStatusChange({
+              userId: session.updateStatusNRP,
+              actionType: 'role_remove',
+              roleName: roleToRemove,
+              actorUser,
+              chatId,
+            })
+          : await userModel.deactivateRoleOrUser(session.updateStatusNRP, roleToRemove);
         const statusStr = updatedUser.status ? "🟢 *AKTIF*" : "🔴 *NONAKTIF*";
         const remainingRoles = await userModel.getUserRoles(session.updateStatusNRP);
         const activeRoles = remainingRoles.length ? remainingRoles.join(", ") : "-";
@@ -2238,7 +2259,18 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     }
     const selectedRole = roles[index];
     try {
-      const updatedUser = await userModel.deactivateRoleOrUser(session.updateStatusNRP, selectedRole);
+      const actorUser = isTelegramStatusHistoryEnabled()
+        ? await userModel.findUserByTelegramChatId(chatId)
+        : null;
+      const updatedUser = isTelegramStatusHistoryEnabled()
+        ? await applyTelegramStatusChange({
+            userId: session.updateStatusNRP,
+            actionType: 'role_remove',
+            roleName: selectedRole,
+            actorUser,
+            chatId,
+          })
+        : await userModel.deactivateRoleOrUser(session.updateStatusNRP, selectedRole);
       const remainingRoles = await userModel.getUserRoles(session.updateStatusNRP);
       const statusStr = updatedUser.status ? "🟢 *AKTIF*" : "🔴 *NONAKTIF*";
       const activeRoles = remainingRoles.length ? remainingRoles.join(", ") : "-";

@@ -236,6 +236,21 @@ export async function getUsersByClient(client_id, roleFilter = null) {
   return res.rows;
 }
 
+// Ambil user nonaktif per client untuk kebutuhan administrasi.
+export async function getInactiveUsersByClient(client_id, roleFilter = null) {
+  const { clause, params } = await buildClientFilter(client_id, 'u', 1, roleFilter);
+  const res = await query(
+    `SELECT u.user_id, u.nama, u.title, u.divisi, u.jabatan, u.status, u.client_id,
+            c.nama AS client_name
+     FROM "user" u
+     LEFT JOIN clients c ON LOWER(c.client_id) = LOWER(u.client_id)
+     WHERE ${clause} AND u.status = false
+     ORDER BY u.divisi NULLS LAST, u.title NULLS LAST, u.nama NULLS LAST, u.user_id`,
+    params
+  );
+  return res.rows;
+}
+
 // Ambil semua user aktif berdasarkan client_id yang spesifik dan role tertentu
 export async function getUsersByClientAndRole(client_id, roleFilter = null) {
   const params = [client_id];
@@ -905,7 +920,8 @@ export async function findUserByTelegramChatId(telegramChatId) {
       bool_or(r.role_name='ditlantas') AS ditlantas,
       bool_or(r.role_name='bidhumas') AS bidhumas,
       bool_or(r.role_name='ditsamapta') AS ditsamapta,
-      bool_or(r.role_name='operator') AS operator
+      bool_or(r.role_name='operator') AS operator,
+      ARRAY_REMOVE(ARRAY_AGG(r.role_name), NULL) AS roles
      FROM "user" u
      LEFT JOIN clients c ON c.client_id = u.client_id
      LEFT JOIN user_roles ur ON u.user_id = ur.user_id

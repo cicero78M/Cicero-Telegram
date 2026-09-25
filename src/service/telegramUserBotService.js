@@ -41,6 +41,7 @@ export async function initializeTelegramUserBot(token, enabled = true) {
     
     // Set up command handlers
     setupCommandHandlers();
+    setupLinkApprovalHandlers();
     
     // Set up message handlers
     setupMessageHandlers();
@@ -137,7 +138,7 @@ function setupCommandHandlers() {
       await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
       return;
     }
-    
+
     const linkedUser = await userModel.findUserByTelegramChatId(chatId);
     
     let helpMessage;
@@ -186,9 +187,9 @@ function setupCommandHandlers() {
         '*1. Tautkan Akun*\n' +
         '   Gunakan: `/link NRP_ANDA`\n' +
         '   Contoh: `/link 081235114745`\n\n' +
-        '*2. Setujui Penautan*\n' +
-        '   Setelah /link, Anda akan menerima kode persetujuan.\n' +
-        '   Ketik: `/approve KODE_ANDA`\n\n' +
+        '*2. Tunggu Persetujuan Admin*\n' +
+        '   Setelah /link, permintaan dikirim ke admin Telegram.\n' +
+        '   Admin akan meninjau dan menyetujui melalui tombol.\n\n' +
         '*3. Akses Menu*\n' +
         '   Setelah berhasil ditautkan, gunakan:\n' +
         '   `/menu` - untuk mengakses menu user\n\n' +
@@ -235,7 +236,7 @@ function setupCommandHandlers() {
         await userBot.sendMessage(chatId, '❌ Data pengguna tidak ditemukan.');
         return;
       }
-      
+
       const polresName = escapeMarkdown(user.client_name || user.client_id || '-');
       const nama = escapeMarkdown(user.nama || '-');
       const title = escapeMarkdown(user.title || '-');
@@ -396,6 +397,15 @@ function setupCommandHandlers() {
         );
         return;
       }
+
+      const userRoles = await userModel.getUserRoles(userId);
+      if (user.status !== true || userRoles.length === 0) {
+        await userBot.sendMessage(
+          chatId,
+          '❌ User belum memenuhi syarat sebagai actor Telegram resmi. Akun harus aktif dan memiliki role yang sah. Hubungi administrator.'
+        );
+        return;
+      }
       
       // Check if this user_id is already linked to another telegram account
       if (user.telegram_chat_id && user.telegram_chat_id !== String(chatId)) {
@@ -412,12 +422,8 @@ function setupCommandHandlers() {
       if (existingPending) {
         await userBot.sendMessage(
           chatId,
-          '⏳ Anda sudah memiliki permintaan penautan yang menunggu persetujuan.\n\n' +
-          `*Kode Persetujuan*: \`${existingPending.approval_code}\`\n\n` +
-          'Silakan konfirmasi kode ini dengan mengetik:\n' +
-          '`/approve KODE_ANDA`\n\n' +
-          `Contoh: \`/approve ${existingPending.approval_code}\`\n\n` +
-          '_Kode akan kedaluwarsa dalam 24 jam._',
+          '⏳ Permintaan penautan Anda masih menunggu persetujuan admin Telegram.\n\n' +
+          'Anda tidak perlu mengetik perintah persetujuan. Tunggu notifikasi dari bot.',
           { parse_mode: 'Markdown' }
         );
         return;
@@ -435,18 +441,18 @@ function setupCommandHandlers() {
       
       await userBot.sendMessage(
         chatId,
-        '✅ *Permintaan Penautan Berhasil Dibuat*\n\n' +
+        '✅ *Permintaan Penautan Diterima*\n\n' +
         `Akun Telegram Anda akan ditautkan dengan:\n` +
         `*Nama*: ${escapeMarkdown(user.nama || '-')}\n` +
         `*NRP/NIP*: ${escapeMarkdown(user.user_id)}\n` +
-        `*Satfung*: ${escapeMarkdown(user.divisi || '-')}\n\n` +
-        `*Kode Persetujuan*: \`${escapeMarkdown(pendingLink.approval_code)}\`\n\n` +
-        'Untuk menyelesaikan penautan, ketik:\n' +
-        '`/approve KODE_ANDA`\n\n' +
-        `Contoh: \`/approve ${escapeMarkdown(pendingLink.approval_code)}\`\n\n` +
-        '_Kode akan kedaluwarsa dalam 24 jam._',
+        `*Pangkat*: ${escapeMarkdown(user.title || '-')}\n` +
+        `*Client*: ${escapeMarkdown(user.client_id || '-')}\n\n` +
+        'Permintaan sudah dikirim ke admin Telegram. Tunggu notifikasi setelah admin menyetujui.\n' +
+        '_Permintaan berlaku 24 jam._',
         { parse_mode: 'Markdown' }
       );
+
+      await notifyLinkAdmins(pendingLink, user);
       
       console.log(`[Telegram User Bot] Link request created for user ${userId}, code: ${pendingLink.approval_code}`);
       
@@ -471,14 +477,21 @@ function setupCommandHandlers() {
       await userBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
       return;
     }
+
+    if (!isTelegramLinkAdmin(chatId)) {
+      await userBot.sendMessage(
+        chatId,
+        'ℹ️ Persetujuan penautan dilakukan oleh admin Telegram.\n\n' +
+        'Permintaan Anda sudah dikirim untuk ditinjau. Tunggu sampai admin menyetujui.'
+      );
+      return;
+    }
     
     if (!approvalCode) {
       await userBot.sendMessage(
         chatId,
-        '⚠️ *Cara menggunakan perintah /approve:*\n\n' +
-        'Ketik: `/approve KODE_ANDA`\n\n' +
-        'Contoh: `/approve 123456`\n\n' +
-        '_Kode persetujuan dikirimkan setelah Anda menjalankan perintah /link._',
+        'ℹ️ Persetujuan dilakukan oleh admin Telegram melalui tombol notifikasi.\n\n' +
+        'User tidak perlu menjalankan perintah ini.',
         { parse_mode: 'Markdown' }
       );
       return;
@@ -498,26 +511,16 @@ function setupCommandHandlers() {
         return;
       }
       
-      // Verify that the approval is from the correct telegram user
-      if (pendingLink.telegram_chat_id !== String(chatId)) {
-        await userBot.sendMessage(
-          chatId,
-          '❌ Kode persetujuan ini tidak cocok dengan akun Telegram Anda.\n\n' +
-          'Pastikan Anda menggunakan akun Telegram yang sama dengan yang digunakan saat membuat permintaan penautan.'
-        );
-        return;
-      }
-      
       // Approve the link
       const approvedLink = await userModel.approveTelegramLink(approvalCode);
-      
+
       await userBot.sendMessage(
-        chatId,
-        '✅ *Penautan Berhasil!*\n\n' +
-        `Akun Telegram Anda telah berhasil ditautkan dengan:\n` +
+        approvedLink.telegram_chat_id,
+        '✅ *Penautan Actor Telegram Disetujui!*\n\n' +
+        `Akun Telegram telah ditautkan dengan:\n` +
         `*Nama*: ${escapeMarkdown(pendingLink.nama || '-')}\n` +
         `*NRP/NIP*: ${escapeMarkdown(pendingLink.user_id)}\n\n` +
-        'Sekarang Anda dapat mengakses menu user dengan perintah:\n' +
+        'Sekarang akun ini resmi menjadi user actor Telegram. Gunakan:\n' +
         '`/menu`',
         { parse_mode: 'Markdown' }
       );
@@ -832,6 +835,88 @@ function setupMessageHandlers() {
       
       // Reset session on error
       session.step = 'main';
+    }
+  });
+}
+
+function getTelegramLinkAdminIds() {
+  const configured = process.env.TELEGRAM_USER_LINK_ADMIN_CHAT_IDS
+    || process.env.TELEGRAM_OPERATOR_ADMIN_CHAT_IDS
+    || '';
+  return String(configured).split(',').map((id) => id.trim()).filter(Boolean);
+}
+
+function isTelegramLinkAdmin(chatId) {
+  return getTelegramLinkAdminIds().includes(String(chatId));
+}
+
+async function notifyLinkAdmins(pendingLink, user) {
+  const admins = getTelegramLinkAdminIds();
+  if (!admins.length) {
+    console.warn('[Telegram User Bot] No link approval admin IDs configured');
+    return;
+  }
+  const message =
+    '🔐 *Permintaan Penautan Actor Telegram*\n\n' +
+    `Nama: *${escapeMarkdown(user.nama || '-')}*\n` +
+    `NRP/NIP: \`${escapeMarkdown(user.user_id)}\`\n` +
+    `Pangkat: ${escapeMarkdown(user.title || '-')}\n` +
+    `Client: ${escapeMarkdown(user.client_id || '-')}\n` +
+    `Telegram: \`${escapeMarkdown(pendingLink.telegram_chat_id)}\`\n\n` +
+    'Pastikan identitas pemohon sesuai sebelum menyetujui.';
+  for (const adminChatId of admins) {
+    await userBot.sendMessage(adminChatId, message, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✅ Setujui', callback_data: `userlink:approve:${pendingLink.approval_code}` },
+          { text: '❌ Tolak', callback_data: `userlink:reject:${pendingLink.approval_code}` },
+        ]],
+      },
+    });
+  }
+}
+
+function setupLinkApprovalHandlers() {
+  if (!userBot) return;
+  userBot.on('callback_query', async (callback) => {
+    const data = String(callback.data || '');
+    if (!data.startsWith('userlink:')) return;
+    const adminChatId = callback.message?.chat?.id;
+    if (!isTelegramLinkAdmin(adminChatId)) {
+      await userBot.answerCallbackQuery(callback.id, { text: 'Hanya admin yang dapat memproses.', show_alert: true });
+      return;
+    }
+    const [, action, approvalCode] = data.split(':');
+    try {
+      if (!approvalCode || !['approve', 'reject'].includes(action)) throw new Error('Permintaan tidak valid');
+      const pendingLink = await userModel.getPendingTelegramLinkByCode(approvalCode);
+      if (!pendingLink) throw new Error('Permintaan tidak ditemukan atau sudah kedaluwarsa');
+      if (action === 'approve') {
+        const approved = await userModel.approveTelegramLink(approvalCode);
+        await userBot.sendMessage(
+          approved.telegram_chat_id,
+          '✅ *Penautan Actor Telegram Disetujui*\n\n' +
+          `NRP/NIP: ${escapeMarkdown(approved.user_id)}\n\n` +
+          'Akun Telegram Anda sekarang resmi tertaut sebagai user actor. Ketik `/profile` atau `/menu` untuk melanjutkan.',
+          { parse_mode: 'Markdown' },
+        );
+        await userBot.answerCallbackQuery(callback.id, { text: 'Penautan disetujui.' });
+      } else {
+        await userModel.rejectTelegramLink(approvalCode);
+        await userBot.sendMessage(
+          pendingLink.telegram_chat_id,
+          '❌ Permintaan penautan Telegram ditolak admin. Jika ada kekeliruan, jalankan `/link NRP/NIP` kembali atau hubungi admin.',
+        );
+        await userBot.answerCallbackQuery(callback.id, { text: 'Penautan ditolak.' });
+      }
+      await userBot.editMessageReplyMarkup({ inline_keyboard: [] }, {
+        chat_id: adminChatId,
+        message_id: callback.message.message_id,
+      });
+    } catch (error) {
+      console.error('[Telegram User Bot] Link approval error:', error);
+      await userBot.answerCallbackQuery(callback.id, { text: error.message, show_alert: true });
     }
   });
 }

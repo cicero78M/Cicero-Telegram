@@ -5,12 +5,16 @@ const mockSendMessage = jest.fn().mockResolvedValue();
 const mockOnText = jest.fn();
 const mockOn = jest.fn();
 const mockStopPolling = jest.fn();
+const mockAnswerCallbackQuery = jest.fn().mockResolvedValue();
+const mockEditMessageReplyMarkup = jest.fn().mockResolvedValue();
 
 const MockTelegramBot = jest.fn().mockImplementation(() => {
   const bot = {
     sendMessage: mockSendMessage,
     onText: mockOnText,
     on: mockOn,
+    answerCallbackQuery: mockAnswerCallbackQuery,
+    editMessageReplyMarkup: mockEditMessageReplyMarkup,
     stopPolling: mockStopPolling,
   };
   return bot;
@@ -44,6 +48,10 @@ const mockFindUserBySocialAccount = jest.fn();
 const mockUpsertUserSocialAccount = jest.fn();
 const mockGetUserSocialAccountsByUserId = jest.fn();
 const mockUpdateUserField = jest.fn();
+const mockGetUserRoles = jest.fn();
+const mockGetPendingTelegramLinkByCode = jest.fn();
+const mockApproveTelegramLink = jest.fn();
+const mockRejectTelegramLink = jest.fn();
 
 jest.unstable_mockModule('../src/model/userModel.js', () => ({
   findUserByTelegramChatId: mockFindUserByTelegramChatId,
@@ -54,6 +62,10 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   upsertUserSocialAccount: mockUpsertUserSocialAccount,
   getUserSocialAccountsByUserId: mockGetUserSocialAccountsByUserId,
   updateUserField: mockUpdateUserField,
+  getUserRoles: mockGetUserRoles,
+  getPendingTelegramLinkByCode: mockGetPendingTelegramLinkByCode,
+  approveTelegramLink: mockApproveTelegramLink,
+  rejectTelegramLink: mockRejectTelegramLink,
 }));
 
 // Mock phone helper
@@ -74,6 +86,8 @@ const {
 describe('Telegram User Bot Commands', () => {
   let profileCommandHandler;
   let updateCommandHandler;
+  let approveCommandHandler;
+  let callbackHandler;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,11 +100,57 @@ describe('Telegram User Bot Commands', () => {
       if (regex.toString().includes('update')) {
         updateCommandHandler = handler;
       }
+      if (regex.toString().includes('approve')) {
+        approveCommandHandler = handler;
+      }
     });
+    mockOn.mockImplementation((event, handler) => {
+      if (event === 'callback_query') callbackHandler = handler;
+    });
+    delete process.env.TELEGRAM_USER_LINK_ADMIN_CHAT_IDS;
+    delete process.env.TELEGRAM_OPERATOR_ADMIN_CHAT_IDS;
   });
 
   afterEach(async () => {
     await stopTelegramUserBot();
+    delete process.env.TELEGRAM_USER_LINK_ADMIN_CHAT_IDS;
+    delete process.env.TELEGRAM_OPERATOR_ADMIN_CHAT_IDS;
+  });
+
+  describe('official actor link approval', () => {
+    it('does not allow the requester to approve their own link', async () => {
+      await initializeTelegramUserBot('test-token', true);
+
+      const msg = { chat: { id: 123456, type: 'private' }, from: { id: 123456 } };
+      await approveCommandHandler(msg, ['/approve 123456', '123456']);
+
+      expect(mockApproveTelegramLink).not.toHaveBeenCalled();
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        123456,
+        expect.stringContaining('dilakukan oleh admin Telegram'),
+        {},
+      );
+    });
+
+    it('allows a configured admin to approve a pending link', async () => {
+      process.env.TELEGRAM_USER_LINK_ADMIN_CHAT_IDS = '999001';
+      await initializeTelegramUserBot('test-token', true);
+      mockGetPendingTelegramLinkByCode.mockResolvedValue({
+        telegram_chat_id: '123456', user_id: '82050014', nama: 'BEKTI PRAMILU K',
+      });
+      mockApproveTelegramLink.mockResolvedValue({ telegram_chat_id: '123456', user_id: '82050014' });
+
+      await callbackHandler({
+        id: 'callback-1',
+        data: 'userlink:approve:123456',
+        from: { id: 999001 },
+        message: { chat: { id: 999001 }, message_id: 10 },
+      });
+
+      expect(mockApproveTelegramLink).toHaveBeenCalledWith('123456');
+      expect(mockAnswerCallbackQuery).toHaveBeenCalledWith('callback-1', { text: 'Penautan disetujui.' });
+      expect(mockEditMessageReplyMarkup).toHaveBeenCalled();
+    });
   });
 
   describe('/profile command', () => {

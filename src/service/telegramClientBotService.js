@@ -20,6 +20,8 @@ import {
 } from './clientService.js';
 import { configureTelegramMenu, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 import { formatNama } from '../utils/utilsHelper.js';
+import { extractVideoId } from '../utils/tiktokHelper.js';
+import { fetchAndStoreSingleTiktokPost } from '../handler/fetchpost/tiktokFetchPost.js';
 
 let clientBot = null;
 let isInitialized = false;
@@ -147,7 +149,8 @@ function setupCommandHandlers() {
       '*Perintah yang tersedia:*\n' +
       '/start - Mulai menggunakan bot\n' +
       '/menu - Tampilkan menu client request\n' +
-      '/help - Tampilkan pesan bantuan ini\n\n' +
+      '/help - Tampilkan pesan bantuan ini\n' +
+      '/tiktokmanual CLIENT_ID link1 link2 - Simpan satu atau beberapa post TikTok manual\n\n' +
       '*Cara penggunaan:*\n' +
       '1. Ketik /menu untuk melihat daftar menu\n' +
       '2. Pilih nomor menu yang ingin diakses\n' +
@@ -155,6 +158,60 @@ function setupCommandHandlers() {
       'Bot ini hanya merespons di *chat private*.';
     
     await clientBot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+  });
+
+  clientBot.onText(/^\/tiktokmanual(?:@[A-Za-z0-9_]+)?\s+([\s\S]+)$/i, async (msg, match) => {
+    const chatId = msg.chat.id;
+    if (msg.chat.type !== 'private') {
+      await clientBot.sendMessage(chatId, '❌ Bot ini hanya bekerja di chat private.');
+      return;
+    }
+
+    const tokens = String(match?.[1] || '')
+      .split(/[\s,;]+/)
+      .map((value) => value.trim().replace(/[)\]}>,.!?]+$/g, ''))
+      .filter(Boolean);
+    if (!tokens.length) {
+      await clientBot.sendMessage(chatId, 'Format: /tiktokmanual CLIENT_ID link1 link2');
+      return;
+    }
+
+    const session = userSessions.get(chatId);
+    const firstVideoId = extractVideoId(tokens[0]);
+    const clientId = firstVideoId
+      ? session?.selectedClientId
+      : tokens.shift();
+    const inputs = firstVideoId ? [firstVideoId, ...tokens] : tokens;
+    const videoIds = [];
+    const invalidInputs = [];
+    for (const input of inputs) {
+      const videoId = extractVideoId(input);
+      if (!videoId) invalidInputs.push(input);
+      else if (!videoIds.includes(videoId)) videoIds.push(videoId);
+    }
+
+    if (!clientId || !videoIds.length) {
+      await clientBot.sendMessage(
+        chatId,
+        'Format: /tiktokmanual CLIENT_ID link1 link2\nContoh: /tiktokmanual KARAWANG https://www.tiktok.com/@akun/video/1234567890123456789',
+      );
+      return;
+    }
+
+    await clientBot.sendMessage(chatId, `⏳ Memproses ${videoIds.length} link TikTok untuk ${clientId}...`);
+    const results = [];
+    for (const videoId of videoIds) {
+      try {
+        const result = await fetchAndStoreSingleTiktokPost(clientId, videoId);
+        results.push(`✅ ${result.videoId} berhasil disimpan`);
+      } catch (error) {
+        results.push(`❌ ${videoId}: ${error.message}`);
+      }
+    }
+    if (invalidInputs.length) {
+      results.push(`⚠️ Input tidak dikenali: ${invalidInputs.join(', ')}`);
+    }
+    await clientBot.sendMessage(chatId, `📥 Hasil Manual Fetch TikTok\nClient: ${clientId}\n\n${results.join('\n')}`);
   });
 
   // /menu command
@@ -237,6 +294,14 @@ function setupMessageHandlers() {
     // Check if user is in management subaction mode
     if (session && session.step === 'management_subaction') {
       await handleManagementSubactionSelection(chatId, text.trim(), msg.from);
+      return;
+    }
+
+    // User memilih laporan user nonaktif dan sedang memilih client aktif.
+    if (session && session.step === 'inactive_user_client_selection') {
+      const result = await clientRequestTelegramHandlers.handleInactiveUserReport(text.trim());
+      userSessions.set(chatId, { ...session, step: 'menu' });
+      await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
       return;
     }
     
@@ -1385,6 +1450,23 @@ async function handleManagementSubactionSelection(chatId, subaction, from) {
         clientLabel
       );
       
+      await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // Special handling for daftar User Nonaktif (2.2.4).
+    if (submenu === '2' && subaction === '4') {
+      userSessions.set(chatId, {
+        ...session,
+        step: 'inactive_user_client_selection'
+      });
+      const clientLabel = formatClientLabel(clientId, clientName);
+      const result = await clientRequestTelegramHandlers.handleManagementSubmenu(
+        submenu,
+        subaction,
+        clientId,
+        clientLabel
+      );
       await clientBot.sendMessage(chatId, result, { parse_mode: 'Markdown' });
       return;
     }

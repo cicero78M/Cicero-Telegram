@@ -8,10 +8,13 @@
 
 import { 
   findClientById, 
+  findAllActiveClients,
   getClientSummary,
   updateClient,
   toggleClientStatus
 } from "../../service/clientService.js";
+import { getInactiveUsersByClient } from "../../model/userModel.js";
+import { sortUsersByPositionRankAndName } from "../../utils/sortingHelper.js";
 import { getGreeting, formatNama, normalizeWhatsAppNumber } from "../../utils/utilsHelper.js";
 import { refreshAggregatorData } from "../../service/aggregatorService.js";
 
@@ -553,7 +556,46 @@ async function handleKelolaUserMenu(clientId, clientLabel) {
     `   Lihat user dengan exception\n\n` +
     `3️⃣ *Ubah Status User*\n` +
     `   Aktifkan atau nonaktifkan user\n\n` +
-    `Ketik nomor aksi (1-3) atau /menu untuk kembali.`;
+    `4️⃣ *User Nonaktif*\n` +
+    `   Pilih client aktif dan tampilkan user nonaktif per satfung\n\n` +
+    `Ketik nomor aksi (1-4) atau /menu untuk kembali.`;
+}
+
+function formatInactiveUsersBySatfung(users = [], clientLabel = "client") {
+  if (!users.length) return `✅ Tidak ada user nonaktif pada client *${clientLabel}*.`;
+  const grouped = new Map();
+  for (const user of users) {
+    const satfung = String(user.divisi || "TANPA SATFUNG").trim() || "TANPA SATFUNG";
+    if (!grouped.has(satfung)) grouped.set(satfung, []);
+    grouped.get(satfung).push(user);
+  }
+  const sections = [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, "id-ID", { sensitivity: "base" }))
+    .map(([satfung, satfungUsers]) => {
+      const rows = sortUsersByPositionRankAndName(satfungUsers).map((user, index) =>
+        `${index + 1}. ${user.title || "-"} — ${user.nama || "-"} — NRP: ${user.user_id || "-"}`
+      );
+      return `*${satfung}*\n${rows.join("\n")}`;
+    });
+  return `🔴 *Daftar User Nonaktif*\nClient: *${clientLabel}*\nJumlah: *${users.length}*\n\n${sections.join("\n\n")}`;
+}
+
+async function handleInactiveUserClientMenu() {
+  const clients = await findAllActiveClients();
+  if (!clients.length) return "❌ Tidak ada client aktif.";
+  return `📋 *Pilih Client Aktif*\n\n${clients
+    .map((client) => `• *${client.client_id}* — ${client.nama || client.client_id}`)
+    .join("\n")}\n\nKetik Client ID untuk melihat user nonaktif, atau /menu untuk kembali.`;
+}
+
+async function handleInactiveUserReport(clientId) {
+  const normalizedClientId = String(clientId || "").trim().toUpperCase();
+  const client = await findClientById(normalizedClientId);
+  if (!client || !client.client_status) {
+    return `❌ Client *${normalizedClientId || "-"}* tidak ditemukan atau tidak aktif. Pilih Client ID dari daftar.`;
+  }
+  const users = await getInactiveUsersByClient(normalizedClientId);
+  return formatInactiveUsersBySatfung(users, client.nama || normalizedClientId);
 }
 
 /**
@@ -712,8 +754,10 @@ async function handleManagementSubmenu(submenu, subaction, clientId, clientLabel
           return `ℹ️ *Kelola Exception User*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
         case "3": // Ubah Status User
           return `ℹ️ *Ubah Status User*\n\nFitur ini memerlukan interaksi multi-step yang kompleks.\nUntuk saat ini, silakan gunakan antarmuka web dashboard.`;
+        case "4": // User Nonaktif
+          return handleInactiveUserClientMenu();
         default:
-          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-3).`;
+          return `❌ Aksi tidak valid. Ketik nomor aksi yang valid (1-4).`;
       }
     
     case "3": // Hapus WA User
@@ -775,6 +819,8 @@ export const clientRequestTelegramHandlers = {
   handleAdminMenu,
   handleKelolaClientMenu,
   handleKelolaUserMenu,
+  handleInactiveUserClientMenu,
+  handleInactiveUserReport,
   handleClientInfo,
   handleHapusWAUserPrompt,
   handleBulkStatusPrompt,

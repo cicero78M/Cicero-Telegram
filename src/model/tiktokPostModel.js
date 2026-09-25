@@ -25,7 +25,17 @@ function normalizeUtcCreatedAt(input) {
 }
 
 function jakartaDateCast(columnAlias = "created_at") {
-  return `(( ${columnAlias} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')`;
+  // The legacy automatic fetcher stored a Jakarta wall-clock timestamp,
+  // while Telegram manual input stored a UTC wall-clock timestamp. Interpret
+  // each source according to its storage convention before filtering by day.
+  const sourceAlias = columnAlias.endsWith(".created_at")
+    ? `${columnAlias.slice(0, -".created_at".length)}source_type`
+    : "source_type";
+  return `(CASE
+    WHEN COALESCE(${sourceAlias}, 'cron_fetch') = 'manual_input'
+      THEN ((${columnAlias} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Jakarta')
+    ELSE (${columnAlias} AT TIME ZONE 'Asia/Jakarta')
+  END)`;
 }
 
 /**
@@ -51,14 +61,17 @@ export async function findPostByVideoId(video_id) {
  * @param {string} video_id
  * @returns {Promise<number>}
  */
-export async function deletePostByVideoId(video_id, clientId = null) {
+export async function deletePostByVideoId(video_id, clientId = null, { allowManual = false } = {}) {
   const normalizedVideoId = (video_id || "").trim();
   const normalizedClientId = String(clientId || "").trim();
   if (!normalizedVideoId || !normalizedClientId) {
     return 0;
   }
+  const manualClause = allowManual ? "" : " AND COALESCE(source_type, 'cron_fetch') <> 'manual_input'";
   const res = await query(
-    `DELETE FROM tiktok_post WHERE video_id = $1 AND LOWER(TRIM(client_id)) = LOWER(TRIM($2))`,
+    `DELETE FROM tiktok_post
+      WHERE video_id = $1
+        AND LOWER(TRIM(client_id)) = LOWER(TRIM($2))${manualClause}`,
     [normalizedVideoId, normalizedClientId]
   );
   return res.rowCount || 0;
@@ -72,23 +85,44 @@ export async function upsertTiktokPosts(client_id, posts) {
   if (!Array.isArray(posts)) return;
   for (const post of posts) {
     await query(
-      `INSERT INTO tiktok_post (client_id, video_id, caption, like_count, comment_count, created_at)
-       VALUES ($1, $2, $3, $4, $5, (COALESCE($6::timestamptz, NOW()) AT TIME ZONE 'UTC'))
+      `INSERT INTO tiktok_post (
+         client_id, video_id, caption, like_count, comment_count,
+         created_at, original_created_at, source_type
+       )
+       VALUES (
+         $1, $2, $3, $4, $5,
+         (COALESCE($6::timestamptz, NOW()) AT TIME ZONE 'UTC'),
+         (COALESCE($7::timestamptz, $6::timestamptz) AT TIME ZONE 'UTC'),
+         COALESCE($8, 'cron_fetch')
+       )
        ON CONFLICT (video_id) DO UPDATE
          SET client_id = EXCLUDED.client_id,
              caption = EXCLUDED.caption,
              like_count = EXCLUDED.like_count,
              comment_count = EXCLUDED.comment_count,
-             created_at = EXCLUDED.created_at`,
+             created_at = CASE
+               WHEN tiktok_post.source_type = 'manual_input' THEN tiktok_post.created_at
+               ELSE EXCLUDED.created_at
+             END,
+             original_created_at = CASE
+               WHEN tiktok_post.source_type = 'manual_input' THEN tiktok_post.original_created_at
+               ELSE COALESCE(tiktok_post.original_created_at, EXCLUDED.original_created_at)
+             END,
+             source_type = CASE
+               WHEN tiktok_post.source_type = 'manual_input' THEN tiktok_post.source_type
+               ELSE EXCLUDED.source_type
+             END`,
       [
         client_id,
         post.video_id || post.id,
         post.desc || post.caption || "",
         post.digg_count ?? post.like_count ?? 0,
         post.comment_count ?? 0,
+        normalizeUtcCreatedAt(post.created_at || null),
         normalizeUtcCreatedAt(
-          post.created_at || post.create_time || post.createTime || null
+          post.original_created_at || post.create_time || post.createTime || post.timestamp || post.created_at || null
         ),
+        post.source_type || 'cron_fetch',
       ]
     );
   }
@@ -125,7 +159,10 @@ export async function upsertTiktokPostWithStatus({
            caption = EXCLUDED.caption,
            like_count = EXCLUDED.like_count,
            comment_count = EXCLUDED.comment_count,
-           created_at = EXCLUDED.created_at
+           created_at = CASE
+             WHEN tiktok_post.source_type = 'manual_input' THEN tiktok_post.created_at
+             ELSE EXCLUDED.created_at
+           END
      RETURNING xmax = '0'::xid AS inserted`,
     [
       client_id,
