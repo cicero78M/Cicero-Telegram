@@ -20,7 +20,7 @@ This document provides a high level overview of the architecture behind Cicero W
 The backend exposes REST endpoints to manage clients, users, and social media analytics. Key modules include:
 
 - `app.js` – Application entry point initializing 4 Telegram bots (Direktorat, Operator, User, Client) with conditional activation.
-- `src/service` – Business services (75+) including Telegram bot services, API wrappers, OTP/email delivery, Google contact sync, RabbitMQ queues, and various utility functions.
+- `src/service` – Business services (75+) including Telegram bot services, API wrappers, OTP/email delivery, Google contact sync, and various utility functions.
 - `src/handler` – Business logic handlers including Telegram bot menu handlers (dirRequest, oprRequest, userMenu, clientRequest), social media fetching, engagement tracking, and data mining operations.
 - `src/model` – Database models (34+) for clients, users, social media posts (Instagram/TikTok), metrics, subscriptions, editorial events, and audit logs.
 - `src/middleware` – Request processing middleware including debug logging and request deduplication.
@@ -54,7 +54,7 @@ Located in the separate `Cicero_Web/cicero-dashboard` directory. The dashboard c
    - Penmas editorial events trigger approval requests that notify administrators through WhatsApp commands handled by `waService.js`.
 
 4. **Queue Processing**
-- High‑volume tasks can be published to RabbitMQ using `src/service/rabbitMQService.js` for asynchronous processing.
+- BullMQ/Redis is used where asynchronous processing is required.
 - OTP emails are dispatched synchronously through `src/service/otpQueue.js` → `src/service/emailService.js`, eliminating the earlier background worker delay.
 
 ## Deployment Considerations
@@ -62,7 +62,7 @@ Located in the separate `Cicero_Web/cicero-dashboard` directory. The dashboard c
 - Both frontend and backend are Node.js applications and can run on the same host or separately.
 - Environment variables are managed via `.env` files (`.env` for backend, `.env.local` for frontend).
 - Use PM2 for clustering and process management in production.
-- Monitor PostgreSQL, Redis, and RabbitMQ health for reliability.
+- Monitor PostgreSQL and Redis health for reliability.
 
 ## Diagram
 
