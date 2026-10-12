@@ -22,6 +22,10 @@ import { configureTelegramMenu, escapeMarkdown } from '../utils/telegramBotHelpe
 import { formatNama } from '../utils/utilsHelper.js';
 import { extractVideoId } from '../utils/tiktokHelper.js';
 import { fetchAndStoreSingleTiktokPost } from '../handler/fetchpost/tiktokFetchPost.js';
+import {
+  attachTelegramPollingErrorHandler,
+  getTelegramPollingOptions,
+} from '../utils/telegramPolling.js';
 
 let clientBot = null;
 let isInitialized = false;
@@ -76,7 +80,8 @@ export async function initializeTelegramClientBot(token, enabled = true) {
 
   try {
     console.log('[Telegram Client Bot] Initializing bot...');
-    clientBot = new TelegramBot(token, { polling: true });
+    clientBot = new TelegramBot(token, { polling: getTelegramPollingOptions() });
+    attachTelegramPollingErrorHandler(clientBot, 'Telegram Client Bot');
     await configureTelegramMenu(clientBot, [
       { command: 'start', description: 'Buka beranda client' },
       { command: 'menu', description: 'Buka menu client' },

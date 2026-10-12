@@ -2,6 +2,10 @@ import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
 import { findAllActiveDirektoratClients } from '../service/clientService.js';
 import { MESSAGE_SPLIT_CONFIG, configureTelegramMenu, escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import {
+  attachTelegramPollingErrorHandler,
+  getTelegramPollingOptions,
+} from '../utils/telegramPolling.js';
 
 let direktoratBot = null;
 let isInitialized = false;
@@ -33,7 +37,8 @@ export async function initializeTelegramDirektoratBot(token, enabled = true) {
 
   try {
     console.log('[Telegram Direktorat Bot] Initializing direktoratBot...');
-    direktoratBot = new TelegramBot(token, { polling: true });
+    direktoratBot = new TelegramBot(token, { polling: getTelegramPollingOptions() });
+    attachTelegramPollingErrorHandler(direktoratBot, 'Telegram Direktorat Bot');
     await configureTelegramMenu(direktoratBot, [
       { command: 'start', description: 'Buka beranda direktorat' },
       { command: 'menu', description: 'Buka menu direktorat' },

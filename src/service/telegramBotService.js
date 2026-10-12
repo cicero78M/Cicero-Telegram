@@ -2,6 +2,10 @@ import TelegramBot from 'node-telegram-bot-api';
 import { performAction } from '../handler/menu/dirRequestHandlers.js';
 import { findAllActiveDirektoratClients } from '../service/clientService.js';
 import { escapeMarkdown } from '../utils/telegramBotHelpers.js';
+import {
+  attachTelegramPollingErrorHandler,
+  getTelegramPollingOptions,
+} from '../utils/telegramPolling.js';
 
 let bot = null;
 let isInitialized = false;
@@ -33,7 +37,8 @@ export async function initializeTelegramBot(token, enabled = true) {
 
   try {
     console.log('[Telegram Bot] Initializing bot...');
-    bot = new TelegramBot(token, { polling: true });
+    bot = new TelegramBot(token, { polling: getTelegramPollingOptions() });
+    attachTelegramPollingErrorHandler(bot, 'Telegram Bot');
     
     // Set up command handlers
     setupCommandHandlers();

@@ -7,6 +7,10 @@ import * as telegramMenuAccessModel from '../model/telegramMenuAccessModel.js';
 import { configureTelegramMenu, createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 import { extractVideoId } from '../utils/tiktokHelper.js';
 import { fetchAndStoreSingleTiktokPost } from '../handler/fetchpost/tiktokFetchPost.js';
+import {
+  attachTelegramPollingErrorHandler,
+  getTelegramPollingOptions,
+} from '../utils/telegramPolling.js';
 
 let operatorBot = null;
 let isInitialized = false;
@@ -36,7 +40,8 @@ export async function initializeTelegramOperatorBot(token, enabled = true) {
 
   try {
     console.log('[Telegram Operator Bot] Initializing operatorBot...');
-    operatorBot = new TelegramBot(token, { polling: true });
+    operatorBot = new TelegramBot(token, { polling: getTelegramPollingOptions() });
+    attachTelegramPollingErrorHandler(operatorBot, 'Telegram Operator Bot');
     await configureTelegramMenu(operatorBot, [
       { command: 'start', description: 'Buka beranda operator' },
       { command: 'menu', description: 'Buka menu operator' },

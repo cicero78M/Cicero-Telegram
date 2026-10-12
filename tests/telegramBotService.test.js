@@ -64,7 +64,9 @@ describe('Telegram Bot Service', () => {
     it('should initialize bot with valid token and enabled flag', async () => {
       const bot = await initializeTelegramBot('test-token', true);
       expect(bot).not.toBeNull();
-      expect(MockTelegramBot).toHaveBeenCalledWith('test-token', { polling: true });
+      expect(MockTelegramBot).toHaveBeenCalledWith('test-token', {
+        polling: { interval: 6000, params: { timeout: 25 } },
+      });
     });
 
     it('should setup command handlers during initialization', async () => {

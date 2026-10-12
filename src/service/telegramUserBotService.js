@@ -4,6 +4,10 @@ import { query } from '../repository/db.js';
 import * as userModel from '../model/userModel.js';
 import { createSendMessageWrapper, escapeMarkdown } from '../utils/telegramBotHelpers.js';
 import { normalizeWhatsappNumber } from '../utils/phoneHelper.js';
+import {
+  attachTelegramPollingErrorHandler,
+  getTelegramPollingOptions,
+} from '../utils/telegramPolling.js';
 
 let userBot = null;
 let isInitialized = false;
@@ -33,7 +37,8 @@ export async function initializeTelegramUserBot(token, enabled = true) {
 
   try {
     console.log('[Telegram User Bot] Initializing userBot...');
-    userBot = new TelegramBot(token, { polling: true });
+    userBot = new TelegramBot(token, { polling: getTelegramPollingOptions() });
+    attachTelegramPollingErrorHandler(userBot, 'Telegram User Bot');
     
     // Add sendMessage wrapper to make bot compatible with WhatsApp-style handlers
     const nativeSendMessage = TelegramBot.prototype.sendMessage;

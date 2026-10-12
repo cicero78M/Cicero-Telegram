@@ -87,7 +87,9 @@ describe('Telegram Client Bot Service - Error Handling', () => {
     it('should initialize successfully with valid token', async () => {
       const bot = await initializeTelegramClientBot('valid-token', true);
       expect(bot).not.toBeNull();
-      expect(MockTelegramBot).toHaveBeenCalledWith('valid-token', { polling: true });
+      expect(MockTelegramBot).toHaveBeenCalledWith('valid-token', {
+        polling: { interval: 6000, params: { timeout: 25 } },
+      });
     });
   });
 
