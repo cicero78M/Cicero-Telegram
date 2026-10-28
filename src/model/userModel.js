@@ -1,6 +1,7 @@
 // src/model/userModel.js
 
-import { query } from '../repository/db.js';
+import { query, withTransaction } from '../repository/db.js';
+import { mixedAmplificationRosterFilter, usesKediriAmplifierRole } from '../utils/amplificationRole.js';
 import { PRIORITY_USER_NAMES } from '../utils/constants.js';
 import { normalizeEmail, normalizeUserId } from '../utils/utilsHelper.js';
 import { minPhoneDigitLength, normalizeWhatsappNumber } from '../utils/phoneHelper.js';
@@ -52,6 +53,30 @@ async function removeRole(userId, roleName) {
     'DELETE FROM user_roles WHERE user_id=$1 AND role_id=(SELECT role_id FROM roles WHERE role_name=$2)',
     [uid, roleName]
   );
+}
+
+// Only the approved KEDIRI maintenance flow may call this scoped mutation.
+// A user row lock serializes changes with cooperating tenant/role updates.
+export async function setKediriAmplifierMembership(userId, clientId, enabled) {
+  if (!usesKediriAmplifierRole(clientId) || typeof enabled !== 'boolean') {
+    throw new Error('Perubahan role amplifier tidak diizinkan');
+  }
+  const uid = normalizeUserId(userId);
+  if (!uid || String(userId).trim() !== uid) throw new Error('NRP/NIP tidak valid');
+  await withTransaction(async (db) => {
+    const user = await db.query(
+      'SELECT user_id FROM "user" WHERE user_id = $1 AND LOWER(client_id) = LOWER($2) FOR UPDATE',
+      [uid, clientId]
+    );
+    if (!user.rows.length) throw new Error('User tidak ditemukan pada client ini');
+    const role = await db.query("SELECT role_id FROM roles WHERE role_name = 'amplifier'");
+    if (!role.rows.length) throw new Error('Role amplifier belum diprovisikan');
+    if (enabled) {
+      await db.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [uid, role.rows[0].role_id]);
+    } else {
+      await db.query('DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2', [uid, role.rows[0].role_id]);
+    }
+  });
 }
 
 export async function getUserRoles(userId) {
@@ -135,6 +160,18 @@ async function buildClientFilter(
   roleFilter = null,
   clientTypeParam = null
 ) {
+  if (roleFilter && typeof roleFilter !== 'string') throw new Error('Role filter tidak valid');
+  if (roleFilter && usesKediriAmplifierRole(clientId) &&
+      !['ditbinmas', 'ditlantas', 'bidhumas', 'ditsamapta', 'operator', 'amplifier'].includes(roleFilter.toLowerCase())) {
+    throw new Error('Role filter tidak valid');
+  }
+  if (roleFilter?.toLowerCase() === 'amplifier') {
+    if (!usesKediriAmplifierRole(clientId)) throw new Error('Role amplifier tidak tersedia untuk client ini');
+    return { clause: `LOWER(${alias}.client_id) = LOWER($${index}) AND EXISTS (
+      SELECT 1 FROM user_roles ur JOIN roles r ON ur.role_id = r.role_id
+      WHERE ur.user_id = ${alias}.user_id AND LOWER(r.role_name) = $${index + 1}
+    )`, params: [clientId, 'amplifier'] };
+  }
   let clientType = clientTypeParam;
   if (!clientType) {
     const { rows } = await query(
@@ -214,7 +251,7 @@ export async function getClientsByRole(roleName, clientId = null) {
 }
 
 // Ambil semua user aktif (status = true), tanpa filter insta
-export async function getUsersByClient(client_id, roleFilter = null) {
+export async function getUsersByClient(client_id, roleFilter = null, { amplificationRoster = false } = {}) {
   const { clause, params } = await buildClientFilter(client_id, 'u', 1, roleFilter);
   const res = await query(
     `SELECT u.user_id, u.nama, u.tiktok,
@@ -230,7 +267,7 @@ export async function getUsersByClient(client_id, roleFilter = null) {
             u.whatsapp, u.email, u.client_id, c.nama AS client_name, c.regional_id AS regional_id
      FROM "user" u
      LEFT JOIN clients c ON LOWER(c.client_id) = LOWER(u.client_id)
-     WHERE ${clause} AND status = true`,
+     WHERE ${clause} AND u.status = true ${amplificationRoster ? mixedAmplificationRosterFilter('u') : ''}`,
     params
   );
   return res.rows;
@@ -284,14 +321,15 @@ export async function getUsersByClientAndRole(client_id, roleFilter = null) {
   return res.rows;
 }
 
-export async function getOperatorsByClient(client_id) {
+export async function getOperatorsByClient(client_id, { amplificationRoster = false } = {}) {
   const { clause, params } = await buildClientFilter(client_id, 'u', 1);
   const res = await query(
     `SELECT u.user_id, u.nama, u.tiktok, u.insta, u.divisi, u.title, u.status, u.exception, u.whatsapp
      FROM "user" u
      JOIN user_roles ur_opr ON ur_opr.user_id = u.user_id
      JOIN roles r_opr ON ur_opr.role_id = r_opr.role_id
-     WHERE ${clause} AND u.status = true AND LOWER(r_opr.role_name) = 'operator'`,
+     WHERE ${clause} AND u.status = true AND LOWER(r_opr.role_name) = 'operator'
+       ${amplificationRoster ? mixedAmplificationRosterFilter('u') : ''}`,
     params
   );
   return res.rows;
@@ -578,7 +616,7 @@ export async function getDirektoratUsers(clientId = null) {
 // Ambil user berdasarkan flag direktorat tertentu (ditbinmas/ditlantas/bidhumas)
 // Jika clientId berupa array, filter berdasarkan list tersebut.
 // Selalu memastikan user memiliki role yang sama dengan client_id-nya.
-export async function getUsersByDirektorat(flag, clientId = null) {
+export async function getUsersByDirektorat(flag, clientId = null, { amplificationRoster = false } = {}) {
   console.log(`[USER MODEL] getUsersByDirektorat called with flag=${flag}, clientId=${JSON.stringify(clientId)}`);
   const validFlags = ['ditbinmas', 'ditlantas', 'bidhumas', 'ditsamapta'];
   if (!validFlags.includes(flag)) {
@@ -632,6 +670,7 @@ export async function getUsersByDirektorat(flag, clientId = null) {
     }
   }
 
+  if (amplificationRoster) sql += mixedAmplificationRosterFilter('u');
   sql += ' GROUP BY u.user_id, c.regional_id';
   console.log('[USER MODEL] getUsersByDirektorat SQL:', sql);
   console.log('[USER MODEL] getUsersByDirektorat Params:', params);
@@ -793,6 +832,7 @@ export async function createUser(userData) {
   // Sesuaikan dengan struktur dan database-mu!
   userData.user_id = normalizeUserId(userData.user_id);
   normalizeUserFields(userData);
+  if (Object.hasOwn(userData, 'amplifier')) throw new Error('Gunakan perubahan role amplifier yang dibatasi client');
   const roles = ['ditbinmas', 'ditlantas', 'bidhumas', 'ditsamapta', 'operator'].filter(
     (r) => userData[r]
   );
@@ -835,6 +875,7 @@ export async function updateUser(userId, userData) {
     delete userData.user_id;
   }
 
+  if (Object.hasOwn(userData, 'amplifier')) throw new Error('Gunakan perubahan role amplifier yang dibatasi client');
   const roleFields = ['ditbinmas', 'ditlantas', 'bidhumas', 'ditsamapta', 'operator'];
   const roles = {};
   let hasRoleUpdates = false;

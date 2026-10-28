@@ -13,6 +13,7 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   getUsersByClient: mockGetUsersByClient,
   getUsersByDirektorat: mockGetUsersByDirektorat,
   getOperatorsByClient: mockGetOperatorsByClient,
+  getUsersByClientAndRole: jest.fn(),
 }));
 jest.unstable_mockModule('../src/model/instaPostModel.js', () => ({
   getShortcodesTodayByClient: mockGetShortcodesTodayByClient,
@@ -39,7 +40,7 @@ test('filters users by roleFlag when provided', async () => {
 
   await absensiLink('POLRES', { roleFlag: 'ditbinmas' });
 
-  expect(mockGetUsersByClient).toHaveBeenCalledWith('POLRES', 'ditbinmas');
+  expect(mockGetUsersByClient).toHaveBeenCalledWith('POLRES', 'ditbinmas', { amplificationRoster: true });
   expect(mockGetUsersByDirektorat).not.toHaveBeenCalled();
 });
 

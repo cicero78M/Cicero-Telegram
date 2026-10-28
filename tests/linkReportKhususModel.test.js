@@ -141,3 +141,23 @@ test('getRekapLinkByClient_khusus filters by operator role', async () => {
   expect(sql).toMatch(/LOWER\(r\.role_name\) = LOWER\(\$\d+\)/);
   expect(params[params.length - 1]).toBe('operator');
 });
+
+test('amplifier report filter is gated to KEDIRI and active users', async () => {
+  const old = process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED;
+  try {
+    process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED = 'true';
+    mockQuery.mockResolvedValue({ rows: [] });
+    await getReportsTodayByClient('KEDIRI', 'amplifier');
+    expect(mockQuery.mock.calls[0][0]).toMatch(/LOWER\(ro.role_name\) = 'amplifier' AND u.status = true/);
+    expect(mockQuery.mock.calls[0][1]).toEqual(['KEDIRI']);
+    await getReportsTodayByShortcode('KEDIRI', 'p', 'amplifier');
+    expect(mockQuery.mock.calls[1][1]).toEqual(['KEDIRI', 'p']);
+    await expect(getReportsTodayByClient('KEDIRI_KOTA', 'amplifier')).rejects.toThrow();
+    process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED = 'false';
+    await expect(getReportsTodayByShortcode('KEDIRI', 'p', 'amplifier')).rejects.toThrow();
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  } finally {
+    if (old === undefined) delete process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED;
+    else process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED = old;
+  }
+});

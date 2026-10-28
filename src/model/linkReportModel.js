@@ -1,7 +1,15 @@
 import { query } from '../repository/db.js';
+import { mixedAmplificationRosterFilter, usesKediriAmplifierRole } from '../utils/amplificationRole.js';
 import { buildPriorityOrderClause } from '../utils/sqlPriority.js';
 
 const LINK_REPORT_INTERVAL = '2 days';
+
+function kediriReportRosterFilter(clientId) {
+  return usesKediriAmplifierRole(clientId) ? ` AND LOWER(u.client_id) = LOWER($1)
+    AND u.status = true AND EXISTS (SELECT 1 FROM user_roles aur
+    JOIN roles ar ON ar.role_id = aur.role_id
+    WHERE aur.user_id = u.user_id AND LOWER(ar.role_name) = 'amplifier')` : '';
+}
 
 export async function hasRecentLinkReport(shortcode, user_id) {
   const res = await query(
@@ -164,14 +172,14 @@ export async function getReportsTodayByClient(client_id) {
   let joinClause =
     'JOIN insta_post p ON p.shortcode = r.shortcode JOIN "user" u ON u.user_id = r.user_id';
   let whereClause = 'u.client_id = $1';
-  if (clientType === 'direktorat') {
+  if (clientType === 'direktorat' && !usesKediriAmplifierRole(client_id)) {
     joinClause +=
       ' JOIN user_roles ur ON ur.user_id = u.user_id JOIN roles ro ON ur.role_id = ro.role_id';
     whereClause = 'ro.role_name = $1';
   }
   const res = await query(
     `SELECT r.* FROM link_report r ${joinClause}
-     WHERE ${whereClause} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
+     WHERE ${whereClause} ${kediriReportRosterFilter(client_id)} ${mixedAmplificationRosterFilter('u')} ${usesKediriAmplifierRole(client_id) ? 'AND LOWER(p.client_id) = LOWER($1)' : ''} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
        AND p.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
      ORDER BY r.created_at ASC`,
     [client_id]
@@ -188,14 +196,14 @@ export async function getReportsYesterdayByClient(client_id) {
   let joinClause =
     'JOIN insta_post p ON p.shortcode = r.shortcode JOIN "user" u ON u.user_id = r.user_id';
   let whereClause = 'u.client_id = $1';
-  if (clientType === 'direktorat') {
+  if (clientType === 'direktorat' && !usesKediriAmplifierRole(client_id)) {
     joinClause +=
       ' JOIN user_roles ur ON ur.user_id = u.user_id JOIN roles ro ON ur.role_id = ro.role_id';
     whereClause = 'ro.role_name = $1';
   }
   const res = await query(
     `SELECT r.* FROM link_report r ${joinClause}
-     WHERE ${whereClause} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta' - INTERVAL '1 day')::date
+     WHERE ${whereClause} ${kediriReportRosterFilter(client_id)} ${mixedAmplificationRosterFilter('u')} ${usesKediriAmplifierRole(client_id) ? 'AND LOWER(p.client_id) = LOWER($1)' : ''} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta' - INTERVAL '1 day')::date
        AND p.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta' - INTERVAL '1 day')::date
      ORDER BY r.created_at ASC`,
     [client_id]
@@ -210,15 +218,16 @@ export async function getReportsTodayByShortcode(client_id, shortcode) {
   );
   const clientType = typeRes.rows[0]?.client_type;
   let joinClause = 'JOIN "user" u ON u.user_id = r.user_id';
+  if (usesKediriAmplifierRole(client_id)) joinClause += ' JOIN insta_post p ON p.shortcode = r.shortcode';
   let whereClause = 'u.client_id = $1';
-  if (clientType === 'direktorat') {
+  if (clientType === 'direktorat' && !usesKediriAmplifierRole(client_id)) {
     joinClause +=
       ' JOIN user_roles ur ON ur.user_id = u.user_id JOIN roles ro ON ur.role_id = ro.role_id';
     whereClause = 'ro.role_name = $1';
   }
   const res = await query(
     `SELECT r.* FROM link_report r ${joinClause}
-     WHERE ${whereClause} AND r.shortcode = $2
+     WHERE ${whereClause} ${kediriReportRosterFilter(client_id)} ${mixedAmplificationRosterFilter('u')} ${usesKediriAmplifierRole(client_id) ? 'AND LOWER(p.client_id) = LOWER($1)' : ''} AND r.shortcode = $2
        AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
      ORDER BY r.created_at ASC`,
     [client_id, shortcode]
@@ -254,15 +263,22 @@ export async function getRekapLinkByClient(
     return params.length;
   };
 
-  const shouldIncludeRoleFilter =
+  const useAmplifiers = usesKediriAmplifierRole(client_id);
+  if (useAmplifiers && [postClientIdOverride, userClientIdOverride].some(
+    (value) => value && String(value).toUpperCase() !== client_id.toUpperCase()
+  )) throw new Error('Client filter tidak sesuai untuk absensi amplifikasi');
+  if (userRoleFilter === 'amplifier' && !useAmplifiers) {
+    throw new Error('Amplifier role is not enabled for this client');
+  }
+  const shouldIncludeRoleFilter = useAmplifiers ? false :
     includePostRoleFilter !== null ? includePostRoleFilter : roleLower === 'ditbinmas';
   const resolvedPostRoleName =
     postRoleFilterName ?? (roleLower === 'ditbinmas' ? roleLower : null);
-  const resolvedPostClientId =
+  const resolvedPostClientId = useAmplifiers ? client_id :
     postClientIdOverride ?? (roleLower === 'ditbinmas' ? null : client_id);
-  const resolvedUserClientId =
+  const resolvedUserClientId = useAmplifiers ? client_id :
     userClientIdOverride ?? (roleLower === 'ditbinmas' ? null : client_id);
-  const resolvedUserRole =
+  const resolvedUserRole = useAmplifiers ? 'amplifier' :
     userRoleFilter ?? (roleLower === 'ditbinmas' ? roleLower : null);
 
   let userClientParamIdx = null;
@@ -371,7 +387,7 @@ export async function getRekapLinkByClient(
     postRegionalFilter
   } = buildPostFilters(sharedClientParamIdx, sharedRoleParamIdx);
 
-  const shouldMatchLinkClientId = matchLinkClientId && userClientParamIdx !== null;
+  const shouldMatchLinkClientId = (useAmplifiers || matchLinkClientId) && userClientParamIdx !== null;
   const linkSumUserJoin = shouldMatchLinkClientId
     ? 'JOIN "user" lu ON lu.user_id = r.user_id'
     : '';
@@ -451,6 +467,7 @@ export async function getRekapLinkByClient(
      LEFT JOIN link_sum ls ON ls.user_id = u.user_id
      WHERE u.status = true
      AND ${userWhere}
+     ${mixedAmplificationRosterFilter('u')}
     GROUP BY u.client_id,  u.user_id, u.title, u.nama, u.insta, u.divisi, u.exception, ls.jumlah_link
     ORDER BY
       ${priorityExpr} ASC,
@@ -495,6 +512,12 @@ export async function getReportsThisMonthByClient(client_id) {
      JOIN insta_post p ON p.shortcode = r.shortcode
      JOIN "user" u ON u.user_id = r.user_id
      WHERE p.client_id = $1
+       ${mixedAmplificationRosterFilter('u')}
+       ${usesKediriAmplifierRole(client_id) ? `AND LOWER(u.client_id) = LOWER($1)
+       AND u.status = true AND EXISTS (
+         SELECT 1 FROM user_roles aur JOIN roles ar ON ar.role_id = aur.role_id
+         WHERE aur.user_id = u.user_id AND LOWER(ar.role_name) = 'amplifier'
+       )` : ''}
        AND date_trunc('month', r.created_at AT TIME ZONE 'Asia/Jakarta') = date_trunc('month', NOW() AT TIME ZONE 'Asia/Jakarta')
      ORDER BY r.created_at ASC`,
     [client_id]
@@ -519,6 +542,12 @@ export async function getReportsPrevMonthByClient(client_id) {
      JOIN insta_post p ON p.shortcode = r.shortcode
      JOIN "user" u ON u.user_id = r.user_id
      WHERE p.client_id = $1
+       ${mixedAmplificationRosterFilter('u')}
+       ${usesKediriAmplifierRole(client_id) ? `AND LOWER(u.client_id) = LOWER($1)
+       AND u.status = true AND EXISTS (
+         SELECT 1 FROM user_roles aur JOIN roles ar ON ar.role_id = aur.role_id
+         WHERE aur.user_id = u.user_id AND LOWER(ar.role_name) = 'amplifier'
+       )` : ''}
        AND date_trunc('month', r.created_at AT TIME ZONE 'Asia/Jakarta') = date_trunc('month', (NOW() AT TIME ZONE 'Asia/Jakarta') - INTERVAL '1 month')
      ORDER BY r.created_at ASC`,
     [client_id]

@@ -1,5 +1,5 @@
 import { query } from "../../../db/index.js";
-import { getUsersByClient, getOperatorsByClient } from "../../../model/userModel.js";
+import { getUsersByClient, getOperatorsByClient, getUsersByClientAndRole } from "../../../model/userModel.js";
 import {
   getShortcodesTodayByClient,
 } from "../../../model/instaPostKhususModel.js";
@@ -7,6 +7,7 @@ import {
   getReportsTodayByClient,
   getReportsTodayByShortcode,
 } from "../../../model/linkReportKhususModel.js";
+import { usesKediriAmplifierRole } from "../../../utils/amplificationRole.js";
 import { hariIndo } from "../../../utils/constants.js";
 import { groupByDivision, sortDivisionKeys, getGreeting } from "../../../utils/utilsHelper.js";
 
@@ -28,12 +29,15 @@ export async function absensiLinkKhusus(client_id, opts = {}) {
   const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
 
   const { nama: clientNama, clientType } = await getClientInfo(client_id);
-  const roleFlag = opts.roleFlag?.toLowerCase() === "operator" ? "operator" : null;
-  const users = roleFlag
-    ? await getOperatorsByClient(client_id)
+  const roleFlag = usesKediriAmplifierRole(client_id) ? "amplifier" :
+    opts.roleFlag?.toLowerCase() === "operator" ? "operator" : null;
+  const users = roleFlag === "amplifier"
+    ? await getUsersByClientAndRole(client_id, roleFlag)
+    : roleFlag
+    ? await getOperatorsByClient(client_id, { amplificationRoster: true })
     : clientType === "org"
-      ? await getOperatorsByClient(client_id)
-      : await getUsersByClient(client_id);
+      ? await getOperatorsByClient(client_id, { amplificationRoster: true })
+      : await getUsersByClient(client_id, null, { amplificationRoster: true });
   const shortcodes = await getShortcodesTodayByClient(client_id);
   if (!shortcodes.length)
     return `Tidak ada konten IG untuk *${clientNama}* hari ini.`;
@@ -137,12 +141,15 @@ export async function absensiLinkKhususPerPost(client_id, opts = {}) {
   const jam = now.toLocaleTimeString("id-ID", { hour12: false, timeZone: "Asia/Jakarta" });
 
   const { nama: clientNama, clientType } = await getClientInfo(client_id);
-  const roleFlag = opts.roleFlag?.toLowerCase() === "operator" ? "operator" : null;
-  const users = roleFlag
-    ? await getOperatorsByClient(client_id)
+  const roleFlag = usesKediriAmplifierRole(client_id) ? "amplifier" :
+    opts.roleFlag?.toLowerCase() === "operator" ? "operator" : null;
+  const users = roleFlag === "amplifier"
+    ? await getUsersByClientAndRole(client_id, roleFlag)
+    : roleFlag
+    ? await getOperatorsByClient(client_id, { amplificationRoster: true })
     : clientType === "org"
-      ? await getOperatorsByClient(client_id)
-      : await getUsersByClient(client_id);
+      ? await getOperatorsByClient(client_id, { amplificationRoster: true })
+      : await getUsersByClient(client_id, null, { amplificationRoster: true });
   const shortcodes = await getShortcodesTodayByClient(client_id);
   if (!shortcodes.length)
     return `Tidak ada konten IG untuk *${clientNama}* hari ini.`;
@@ -157,7 +164,11 @@ export async function absensiLinkKhususPerPost(client_id, opts = {}) {
   msg += `*Jumlah Konten:* ${shortcodes.length}\n`;
 
   for (const sc of shortcodes) {
-    const reports = await getReportsTodayByShortcode(client_id, sc, roleFlag);
+    let reports = await getReportsTodayByShortcode(client_id, sc, roleFlag);
+    if (roleFlag === "amplifier" || (clientType === "direktorat" && usesKediriAmplifierRole("KEDIRI"))) {
+      const userIds = new Set(users.map((u) => u.user_id));
+      reports = reports.filter((report) => userIds.has(report.user_id));
+    }
     const userSudah = [];
     const userBelum = [];
     const reportUsers = new Set(reports.map((r) => r.user_id));

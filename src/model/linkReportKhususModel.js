@@ -1,3 +1,4 @@
+import { mixedAmplificationRosterFilter, usesKediriAmplifierRole } from "../utils/amplificationRole.js";
 import { query } from '../repository/db.js';
 import { buildPriorityOrderClause } from '../utils/sqlPriority.js';
 
@@ -118,15 +119,30 @@ export async function getReportsTodayByClient(client_id, roleFlag = null) {
   let whereClause = 'u.client_id = $1';
   let joinClause = 'JOIN "user" u ON u.user_id = r.user_id';
   
-  if (roleFlag && roleFlag.toLowerCase() === OPERATOR_ROLE_NAME) {
+  if (usesKediriAmplifierRole(client_id)) {
+    joinClause += ' JOIN insta_post_khusus p ON p.shortcode = r.shortcode';
+    whereClause += ' AND LOWER(p.client_id) = LOWER($1)';
+  }
+  const normalizedRole = usesKediriAmplifierRole(client_id) ? 'amplifier' :
+    typeof roleFlag === 'string' ? roleFlag.toLowerCase() : null;
+  if (roleFlag && (typeof roleFlag !== 'string' || ![OPERATOR_ROLE_NAME, 'amplifier'].includes(roleFlag.toLowerCase()))) {
+    throw new Error('Role filter tidak valid');
+  }
+  if (normalizedRole === 'amplifier' && !usesKediriAmplifierRole(client_id)) {
+    throw new Error('Amplifier role is not enabled for this client');
+  }
+  if (normalizedRole === OPERATOR_ROLE_NAME || normalizedRole === 'amplifier') {
     joinClause += ' JOIN user_roles ur ON ur.user_id = u.user_id JOIN roles ro ON ur.role_id = ro.role_id';
-    whereClause += ` AND LOWER(ro.role_name) = '${OPERATOR_ROLE_NAME}'`;
+    // Both values are fixed internal constants, never interpolated user input.
+    whereClause += normalizedRole === 'amplifier'
+      ? " AND LOWER(ro.role_name) = 'amplifier' AND u.status = true"
+      : ` AND LOWER(ro.role_name) = '${OPERATOR_ROLE_NAME}'`;
   }
   
   const res = await query(
     `SELECT r.* FROM link_report_khusus r
      ${joinClause}
-     WHERE ${whereClause} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
+     WHERE ${whereClause} ${mixedAmplificationRosterFilter('u')} AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
      ORDER BY r.created_at ASC`,
     [client_id]
   );
@@ -137,15 +153,30 @@ export async function getReportsTodayByShortcode(client_id, shortcode, roleFlag 
   let whereClause = 'u.client_id = $1 AND r.shortcode = $2';
   let joinClause = 'JOIN "user" u ON u.user_id = r.user_id';
   
-  if (roleFlag && roleFlag.toLowerCase() === OPERATOR_ROLE_NAME) {
+  if (usesKediriAmplifierRole(client_id)) {
+    joinClause += ' JOIN insta_post_khusus p ON p.shortcode = r.shortcode';
+    whereClause += ' AND LOWER(p.client_id) = LOWER($1)';
+  }
+  const normalizedRole = usesKediriAmplifierRole(client_id) ? 'amplifier' :
+    typeof roleFlag === 'string' ? roleFlag.toLowerCase() : null;
+  if (roleFlag && (typeof roleFlag !== 'string' || ![OPERATOR_ROLE_NAME, 'amplifier'].includes(roleFlag.toLowerCase()))) {
+    throw new Error('Role filter tidak valid');
+  }
+  if (normalizedRole === 'amplifier' && !usesKediriAmplifierRole(client_id)) {
+    throw new Error('Amplifier role is not enabled for this client');
+  }
+  if (normalizedRole === OPERATOR_ROLE_NAME || normalizedRole === 'amplifier') {
     joinClause += ' JOIN user_roles ur ON ur.user_id = u.user_id JOIN roles ro ON ur.role_id = ro.role_id';
-    whereClause += ` AND LOWER(ro.role_name) = '${OPERATOR_ROLE_NAME}'`;
+    // Both values are fixed internal constants, never interpolated user input.
+    whereClause += normalizedRole === 'amplifier'
+      ? " AND LOWER(ro.role_name) = 'amplifier' AND u.status = true"
+      : ` AND LOWER(ro.role_name) = '${OPERATOR_ROLE_NAME}'`;
   }
   
   const res = await query(
     `SELECT r.* FROM link_report_khusus r
      ${joinClause}
-     WHERE ${whereClause}
+     WHERE ${whereClause} ${mixedAmplificationRosterFilter('u')}
        AND r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date
      ORDER BY r.created_at ASC`,
     [client_id, shortcode]
@@ -163,6 +194,12 @@ export async function getRekapLinkByClient(
     userClientId: userClientIdOverride = null,
     userRoleFilter = null
   } = options;
+  if ((userRoleFilter === 'amplifier' || roleFlag?.toLowerCase() === 'amplifier') &&
+      !usesKediriAmplifierRole(client_id)) throw new Error('Amplifier role is not enabled for this client');
+  if (usesKediriAmplifierRole(client_id) && userClientIdOverride &&
+      String(userClientIdOverride).toUpperCase() !== client_id.toUpperCase()) {
+    throw new Error('Client filter tidak sesuai untuk absensi amplifikasi');
+  }
   let dateFilterPost = "p.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date";
   let dateFilterReport = "r.created_at::date = (NOW() AT TIME ZONE 'Asia/Jakarta')::date";
   const params = [client_id];
@@ -209,11 +246,12 @@ export async function getRekapLinkByClient(
   const priorityExpr = `(${priorityCase})`;
 
   const resolvedUserClientId = userClientIdOverride ?? client_id;
-  const resolvedUserRole = userRoleFilter ?? (roleFlag ? roleFlag.toLowerCase() : null);
-  
+  const resolvedUserRole = usesKediriAmplifierRole(client_id)
+    ? 'amplifier' : userRoleFilter ?? (roleFlag ? roleFlag.toLowerCase() : null);
+
   let operatorRoleFilter = '';
-  if (resolvedUserRole === OPERATOR_ROLE_NAME) {
-    linkParams.push(OPERATOR_ROLE_NAME);
+  if ([OPERATOR_ROLE_NAME, 'amplifier'].includes(resolvedUserRole)) {
+    linkParams.push(resolvedUserRole);
     operatorRoleFilter = `AND EXISTS (
       SELECT 1 FROM user_roles ur
       JOIN roles r ON ur.role_id = r.role_id
@@ -260,15 +298,16 @@ export async function getRekapLinkByClient(
      LEFT JOIN link_sum ls ON ls.user_id = u.user_id
      WHERE u.status = true
        AND (
-         (SELECT client_type FROM cli) <> 'direktorat' AND u.client_id = $1
+         ${usesKediriAmplifierRole(client_id) ? 'LOWER(u.client_id) = LOWER($1)' : `(SELECT client_type FROM cli) <> 'direktorat' AND u.client_id = $1
        OR (SELECT client_type FROM cli) = 'direktorat' AND EXISTS (
          SELECT 1 FROM user_roles ur
           JOIN roles r ON ur.role_id = r.role_id
           WHERE ur.user_id = u.user_id AND r.role_name = $1
-        )
+        )`}
       )
       ${operatorRoleFilter}
       ${userClientFilter}
+      ${mixedAmplificationRosterFilter('u')}
     ORDER BY
       ${priorityExpr} ASC,
       CASE WHEN ${priorityExpr} = ${fallbackRank} THEN UPPER(u.nama) END ASC,

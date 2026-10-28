@@ -1,4 +1,5 @@
 // src/handler/menu/oprRequestHandlers.js
+import { amplificationRole, usesKediriAmplifierRole } from "../../utils/amplificationRole.js";
 import { formatToWhatsAppId } from "../../utils/phoneHelper.js";
 import { saveContactIfNew } from "../../service/googleContactsService.js";
 import { hariIndo } from "../../utils/constants.js";
@@ -461,7 +462,9 @@ function formatClientSelectionMessage(clients) {
 }
 
 async function getOperatorUserIds(userModel, clientId) {
-  const operators = await userModel.getUsersByClient(clientId, OPERATOR_ROLE);
+  const operators = usesKediriAmplifierRole(clientId)
+    ? await userModel.getUsersByClientAndRole(clientId, "amplifier")
+    : await userModel.getUsersByClient(clientId, OPERATOR_ROLE);
   return new Set(operators.map((operator) => operator.user_id));
 }
 
@@ -617,7 +620,7 @@ ${menuItems.join('\n')}
         await waClient.sendMessage(
           chatId,
           appendSubmenuBackInstruction(
-            `👥 MENU MANAJEMEN USER\n1️⃣ Tambah user baru\n2️⃣ Perbarui data user\n3️⃣ Ubah status user (aktif/nonaktif)\n4️⃣ Cek data user (NRP/NIP)\n5️⃣ Absensi registrasi user\n6️⃣ Absensi update data username\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
+            `👥 MENU MANAJEMEN USER\n1️⃣ Tambah user baru\n2️⃣ Perbarui data user\n3️⃣ Ubah status user (aktif/nonaktif)\n4️⃣ Cek data user (NRP/NIP)\n5️⃣ Absensi registrasi user\n6️⃣ Absensi update data username${usesKediriAmplifierRole(client.client_id) ? "\n7️⃣ Kelola role amplifier" : ""}\n\nKetik angka menu di atas, menu untuk kembali, atau batal untuk keluar.`
           )
         );
         return;
@@ -789,10 +792,83 @@ ${menuItems.join('\n')}
         userModel
       );
     }
+    if (/^7$/.test(text.trim())) {
+      const client = await ensureUserMenuAccess(session, chatId, waClient, pool);
+      if (!client || !usesKediriAmplifierRole(client.client_id) ||
+          !Array.isArray(session.opr_clients) || !session.opr_clients.some(
+            (entry) => entry.client_id === client.client_id
+          )) {
+        await waClient.sendMessage(chatId, "❌ Akses role amplifier tidak tersedia.");
+        return;
+      }
+      clean();
+      session.amplifier_client_id = client.client_id;
+      session.step = "amplifierRole_nrp";
+      await waClient.sendMessage(chatId, "Masukkan NRP/NIP user KEDIRI untuk mengelola role amplifier:");
+      return;
+    }
     await waClient.sendMessage(
       chatId,
       "Menu tidak dikenal. 🔎 Balas angka 1-6, menu untuk kembali, atau ketik 🚫 batal untuk keluar."
     );
+  },
+
+  amplifierRole_nrp: async (session, chatId, text, waClient, pool, userModel) => {
+    if (/^(batal|cancel|exit)$/i.test(text.trim())) {
+      delete session.amplifier_client_id;
+      delete session.amplifier_user_id;
+      session.step = "main";
+      return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+    }
+    const clientId = session.amplifier_client_id;
+    const nrp = text.trim();
+    const allowed = usesKediriAmplifierRole(clientId) &&
+      session.selected_client_id === clientId && Array.isArray(session.opr_clients) &&
+      session.opr_clients.some((client) => client.client_id === clientId);
+    if (!allowed || !/^[0-9a-zA-Z]+$/.test(nrp)) {
+      await waClient.sendMessage(chatId, "❌ Akses atau NRP/NIP tidak valid.");
+      return;
+    }
+    // Do not use the wider client-or-role lookup for authorization.
+    const user = await userModel.findUserById(nrp);
+    if (!user || String(user.client_id || "").toUpperCase() !== clientId.toUpperCase()) {
+      await waClient.sendMessage(chatId, "❌ User tidak ditemukan pada client yang diizinkan.");
+      return;
+    }
+    session.amplifier_user_id = user.user_id;
+    session.step = "amplifierRole_action";
+    await waClient.sendMessage(chatId, `Role amplifier untuk *${user.nama || user.user_id}*: 1. Tambah  2. Hapus\nRole lainnya tidak diubah. Balas 1 atau 2, atau batal.`);
+  },
+
+  amplifierRole_action: async (session, chatId, text, waClient, pool, userModel) => {
+    if (/^(batal|cancel|exit)$/i.test(text.trim())) {
+      delete session.amplifier_client_id;
+      delete session.amplifier_user_id;
+      session.step = "main";
+      return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
+    }
+    if (!/^[12]$/.test(text.trim())) {
+      await waClient.sendMessage(chatId, "❌ Balas 1 atau 2, atau batal.");
+      return;
+    }
+    const clientId = session.amplifier_client_id;
+    const allowed = usesKediriAmplifierRole(clientId) &&
+      session.selected_client_id === clientId && Array.isArray(session.opr_clients) &&
+      session.opr_clients.some((client) => client.client_id === clientId);
+    if (!allowed || !session.amplifier_user_id) {
+      await waClient.sendMessage(chatId, "❌ Akses role amplifier tidak tersedia.");
+      return;
+    }
+    try {
+      await userModel.setKediriAmplifierMembership(session.amplifier_user_id, clientId, text.trim() === "1");
+      await waClient.sendMessage(chatId, "✅ Role amplifier diperbarui. Role lain tidak diubah.");
+    } catch (error) {
+      await waClient.sendMessage(chatId, `❌ Gagal memperbarui role amplifier: ${error.message}`);
+    }
+    delete session.amplifier_client_id;
+    delete session.amplifier_user_id;
+    session.step = "main";
+    return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
   },
 
   kelolaEngagement_menu: async (session, chatId, text, waClient, pool, userModel) => {
@@ -1679,7 +1755,7 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     const reports = await getReportsTodayByClient(clientId);
     const operatorIds = await getOperatorUserIds(userModel, clientId);
     if (!operatorIds.size) {
-      await waClient.sendMessage(chatId, `Tidak ada user operator aktif untuk client *${clientId}*.`);
+      await waClient.sendMessage(chatId, `Tidak ada user ${amplificationRole(clientId)} aktif untuk client *${clientId}*.`);
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
@@ -1769,7 +1845,7 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     const reports = await getReportsYesterdayByClient(clientId);
     const operatorIds = await getOperatorUserIds(userModel, clientId);
     if (!operatorIds.size) {
-      await waClient.sendMessage(chatId, `Tidak ada user operator aktif untuk client *${clientId}*.`);
+      await waClient.sendMessage(chatId, `Tidak ada user ${amplificationRole(clientId)} aktif untuk client *${clientId}*.`);
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
@@ -1855,14 +1931,16 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     }
     const { getReportsTodayByClient } = await import("../../model/linkReportKhususModel.js");
     const { getShortcodesTodayByClient } = await import("../../model/instaPostKhususModel.js");
-    const reports = await getReportsTodayByClient(clientId, OPERATOR_ROLE);
+    const reports = await getReportsTodayByClient(clientId, amplificationRole(clientId));
     const operatorIds = await getOperatorUserIds(userModel, clientId);
     if (!operatorIds.size) {
-      await waClient.sendMessage(chatId, `Tidak ada user operator aktif untuk client *${clientId}*.`);
+      await waClient.sendMessage(chatId, `Tidak ada user ${amplificationRole(clientId)} aktif untuk client *${clientId}*.`);
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
-    if (!reports || reports.length === 0) {
+    const selectedReports = usesKediriAmplifierRole(clientId)
+      ? reports.filter((report) => operatorIds.has(report.user_id)) : reports;
+    if (!selectedReports || selectedReports.length === 0) {
       await waClient.sendMessage(chatId, `Tidak ada laporan link khusus hari ini untuk client *${clientId}*.`);
       session.step = "main";
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
@@ -1870,7 +1948,7 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     const shortcodes = await getShortcodesTodayByClient(clientId);
     const list = { facebook: [], instagram: [], twitter: [], tiktok: [], youtube: [] };
     const users = new Set();
-    reports.forEach((r) => {
+    selectedReports.forEach((r) => {
       users.add(r.user_id);
       if (r.facebook_link) list.facebook.push(r.facebook_link);
       if (r.instagram_link) list.instagram.push(r.instagram_link);
@@ -1963,7 +2041,7 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     const reports = await getReportsTodayByShortcode(clientId, sc);
     const operatorIds = await getOperatorUserIds(userModel, clientId);
     if (!operatorIds.size) {
-      await waClient.sendMessage(chatId, `Tidak ada user operator aktif untuk client *${clientId}*.`);
+      await waClient.sendMessage(chatId, `Tidak ada user ${amplificationRole(clientId)} aktif untuk client *${clientId}*.`);
       session.step = "main";
       delete session.rekapShortcodes;
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
@@ -2079,15 +2157,17 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     const sc = shortcodes[idx];
     const clientId = session.selected_client_id;
     const { getReportsTodayByShortcode } = await import("../../model/linkReportKhususModel.js");
-    const reports = await getReportsTodayByShortcode(clientId, sc, OPERATOR_ROLE);
+    const reports = await getReportsTodayByShortcode(clientId, sc, amplificationRole(clientId));
     const operatorIds = await getOperatorUserIds(userModel, clientId);
     if (!operatorIds.size) {
-      await waClient.sendMessage(chatId, `Tidak ada user operator aktif untuk client *${clientId}*.`);
+      await waClient.sendMessage(chatId, `Tidak ada user ${amplificationRole(clientId)} aktif untuk client *${clientId}*.`);
       session.step = "main";
       delete session.rekapShortcodes;
       return oprRequestHandlers.main(session, chatId, "", waClient, pool, userModel);
     }
-    if (!reports || reports.length === 0) {
+    const selectedReports = usesKediriAmplifierRole(clientId)
+      ? reports.filter((report) => operatorIds.has(report.user_id)) : reports;
+    if (!selectedReports || selectedReports.length === 0) {
       await waClient.sendMessage(chatId, `Belum ada laporan link untuk post tersebut.`);
       session.step = "main";
       delete session.rekapShortcodes;
@@ -2095,7 +2175,7 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
     }
     const list = { facebook: [], instagram: [], twitter: [], tiktok: [], youtube: [] };
     const users = new Set();
-    reports.forEach(r => {
+    selectedReports.forEach(r => {
       users.add(r.user_id);
       if (r.facebook_link) list.facebook.push(r.facebook_link);
       if (r.instagram_link) list.instagram.push(r.instagram_link);
@@ -2210,6 +2290,10 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
           return;
         }
         const roleToRemove = session.updateStatusRoleChoice || roles[0] || null;
+        if (roleToRemove?.toLowerCase() === "amplifier") {
+          await waClient.sendMessage(chatId, "❌ Gunakan menu Kelola role amplifier untuk perubahan role ini.");
+          return;
+        }
         const actorUser = isTelegramStatusHistoryEnabled()
           ? await userModel.findUserByTelegramChatId(chatId)
           : null;
@@ -2258,6 +2342,10 @@ Balas angka (1/2) sesuai status baru, atau batal untuk keluar.
       return;
     }
     const selectedRole = roles[index];
+    if (selectedRole?.toLowerCase() === "amplifier") {
+      await waClient.sendMessage(chatId, "❌ Gunakan menu Kelola role amplifier untuk perubahan role ini.");
+      return;
+    }
     try {
       const actorUser = isTelegramStatusHistoryEnabled()
         ? await userModel.findUserByTelegramChatId(chatId)

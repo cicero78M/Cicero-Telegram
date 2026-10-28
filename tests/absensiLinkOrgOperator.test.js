@@ -13,6 +13,7 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   getUsersByClient: mockGetUsersByClient,
   getUsersByDirektorat: mockGetUsersByDirektorat,
   getOperatorsByClient: mockGetOperatorsByClient,
+  getUsersByClientAndRole: jest.fn(),
 }));
 jest.unstable_mockModule('../src/model/instaPostModel.js', () => ({
   getShortcodesTodayByClient: mockGetShortcodesTodayByClient,
@@ -39,7 +40,7 @@ test('uses operator role for org clients', async () => {
 
   await absensiLink('ORG1');
 
-  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('ORG1');
+  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('ORG1', { amplificationRoster: true });
   expect(mockGetUsersByClient).not.toHaveBeenCalled();
   expect(mockGetUsersByDirektorat).not.toHaveBeenCalled();
 });

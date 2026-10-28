@@ -3,7 +3,8 @@ import { jest } from '@jest/globals';
 const mockQuery = jest.fn();
 
 jest.unstable_mockModule('../src/repository/db.js', () => ({
-  query: mockQuery
+  query: mockQuery,
+  withTransaction: jest.fn(async (callback) => callback({ query: mockQuery }))
 }));
 
 let findUserByIdAndWhatsApp;

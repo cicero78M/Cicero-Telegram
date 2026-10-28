@@ -11,6 +11,7 @@ jest.unstable_mockModule('../src/db/index.js', () => ({ query: mockQuery }));
 jest.unstable_mockModule('../src/model/userModel.js', () => ({
   getUsersByClient: mockGetUsersByClient,
   getOperatorsByClient: mockGetOperatorsByClient,
+  getUsersByClientAndRole: jest.fn(),
 }));
 jest.unstable_mockModule('../src/model/instaPostKhususModel.js', () => ({
   getShortcodesTodayByClient: mockGetShortcodesTodayByClient,
@@ -37,7 +38,7 @@ test('uses operator role for org clients', async () => {
 
   await absensiLinkKhusus('ORG1');
 
-  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('ORG1');
+  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('ORG1', { amplificationRoster: true });
   expect(mockGetUsersByClient).not.toHaveBeenCalled();
 });
 
@@ -49,7 +50,7 @@ test('passes operator roleFlag to getReportsTodayByClient when roleFlag is opera
 
   await absensiLinkKhusus('TEST', { roleFlag: 'operator' });
 
-  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('TEST');
+  expect(mockGetOperatorsByClient).toHaveBeenCalledWith('TEST', { amplificationRoster: true });
   expect(mockGetReportsTodayByClient).toHaveBeenCalledWith('TEST', 'operator');
 });
 

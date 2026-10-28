@@ -11,6 +11,10 @@ describe('oprRequestHandlers - Conditional Menu Display', () => {
     // Reset all modules before each test
     jest.resetModules();
     
+    // Never connect to the configured database when exercising menu rendering.
+    jest.unstable_mockModule('../../../src/model/telegramMenuAccessModel.js', () => ({
+      findApprovedClients: jest.fn().mockResolvedValue([]),
+    }));
     // Mock dependencies
     jest.unstable_mockModule('../../../src/utils/phoneHelper.js', () => ({
       formatToWhatsAppId: jest.fn((id) => id)

@@ -11,6 +11,7 @@ jest.unstable_mockModule('../src/model/userModel.js', () => ({
   getUsersByClient: jest.fn(),
   getUsersByDirektorat: mockGetUsersByDirektorat,
   getOperatorsByClient: mockGetOperatorsByClient,
+  getUsersByClientAndRole: jest.fn(),
 }));
 jest.unstable_mockModule('../src/model/instaPostModel.js', () => ({
   getShortcodesTodayByClient: mockGetShortcodesTodayByClient,
@@ -56,4 +57,19 @@ test('aggregates directorate data per client', async () => {
   expect(msg).toContain('POLRES B');
   expect(msg).toContain('❌ *Belum melaksanakan* : *1 user*');
   expect(msg).not.toMatch(/\bAIPTU\b/i);
+});
+
+test('directorate amplification requests a mixed-client filtered roster', async () => {
+  const previous = process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED;
+  process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED = 'true';
+  try {
+    mockQuery.mockResolvedValue({ rows: [{ nama: 'DIT A', client_type: 'direktorat' }] });
+    mockGetShortcodesTodayByClient.mockResolvedValue(['sc1']);
+    mockGetUsersByDirektorat.mockResolvedValue([{ user_id: 1, client_id: 'kediri', status: true }]);
+    mockGetReportsTodayByClient.mockResolvedValue([{ user_id: 1, shortcode: 'sc1', facebook_link: 'a' }]);
+    await absensiLink('ditbinmas');
+    expect(mockGetUsersByDirektorat).toHaveBeenCalledWith('ditbinmas', null, { amplificationRoster: true });
+  } finally {
+    if (previous === undefined) delete process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED; else process.env.KEDIRI_AMPLIFIER_ROLE_ENABLED = previous;
+  }
 });

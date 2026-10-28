@@ -322,9 +322,20 @@ function setupMessageHandlers() {
       const authorizedClients = await getAuthorizedClients(msg);
       if (!authorizedClients) return;
       session.opr_clients = authorizedClients;
-      if (session.selected_client_id && !authorizedClients.some((client) => client.client_id === session.selected_client_id)) {
+      const isAuthorizedClient = (clientId) => authorizedClients.some(
+        (client) => client.client_id === clientId
+      );
+      if ((session.selected_client_id && !isAuthorizedClient(session.selected_client_id)) ||
+          (session.absensi_client_id && !isAuthorizedClient(session.absensi_client_id)) ||
+          (session.amplifier_client_id && !isAuthorizedClient(session.amplifier_client_id))) {
         delete session.selected_client_id;
-        session.step = ["choose_client"][0];
+        delete session.absensi_client_id;
+        delete session.amplifier_client_id;
+        delete session.amplifier_user_id;
+        delete session.rekapShortcodes;
+        session.step = 'choose_client';
+        await operatorBot.sendMessage(chatId, '❌ Akses client tidak tersedia. Ketik /menu untuk memilih client yang diizinkan.');
+        return;
       }
       // Create a pool-like object that uses the query function
       const pool = { query };

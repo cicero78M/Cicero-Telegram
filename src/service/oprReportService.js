@@ -1,6 +1,7 @@
 // src/service/oprReportService.js
 
 import { query } from '../repository/db.js';
+import { usesKediriAmplifierRole } from '../utils/amplificationRole.js';
 import { hariIndo } from '../utils/constants.js';
 import { getGreeting } from '../utils/utilsHelper.js';
 
@@ -13,10 +14,10 @@ async function getOperatorUserIds(clientId) {
      FROM "user" u
      JOIN user_roles ur ON u.user_id = ur.user_id
      JOIN roles r ON ur.role_id = r.role_id
-     WHERE r.role_name = 'operator' 
+     WHERE r.role_name = $2
        AND u.client_id = $1 
        AND u.status = true`,
-    [clientId]
+    [clientId, usesKediriAmplifierRole(clientId) ? 'amplifier' : 'operator']
   );
   return new Set(result.rows.map((row) => row.user_id));
 }

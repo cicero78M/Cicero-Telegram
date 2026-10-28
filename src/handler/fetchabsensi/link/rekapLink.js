@@ -1,3 +1,5 @@
+import { usesKediriAmplifierRole } from "../../../utils/amplificationRole.js";
+import { getUsersByClientAndRole } from "../../../model/userModel.js";
 import { query } from "../../../db/index.js";
 import { getShortcodesTodayByClient } from "../../../model/instaPostModel.js";
 import { getReportsTodayByClient } from "../../../model/linkReportModel.js";
@@ -13,7 +15,12 @@ async function getClientName(clientId) {
 }
 
 export async function rekapLink(clientId) {
-  const reports = await getReportsTodayByClient(clientId);
+  let reports = await getReportsTodayByClient(clientId);
+  if (usesKediriAmplifierRole(clientId)) {
+    const users = await getUsersByClientAndRole(clientId, "amplifier");
+    const eligible = new Set(users.map((user) => user.user_id));
+    reports = reports.filter((report) => eligible.has(report.user_id));
+  }
   if (!reports || reports.length === 0) {
     return `Tidak ada laporan link hari ini untuk client *${clientId}*.`;
   }
