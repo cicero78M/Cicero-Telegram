@@ -10,6 +10,8 @@ export const env = cleanEnv(process.env, {
   DB_NAME: str({ default: '' }),
   DB_PASS: str({ default: '' }),
   DB_PORT: port({ default: 5432 }),
+  DB_SSL: bool({ default: false }),
+  DB_SSL_REJECT_UNAUTHORIZED: bool({ default: true }),
   DB_DRIVER: str({ default: 'postgres' }),
   REDIS_URL: str({ default: 'redis://localhost:6379' }),
   REDIS_SENTINELS: str({ default: '' }),

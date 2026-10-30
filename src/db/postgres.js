@@ -8,6 +8,11 @@ const pool = new Pool({
   database: env.DB_NAME,
   password: env.DB_PASS,
   port: env.DB_PORT,
+  ...(env.DB_SSL
+    ? {
+        ssl: { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED },
+      }
+    : {}),
 });
 
 export const query = (text, params) => pool.query(text, params);
